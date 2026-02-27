@@ -1,0 +1,72 @@
+//
+//  ImageSegmentationView.swift
+//  MLX Vision
+//
+//  Created by Ivan Petrukha on 21.02.2026.
+//
+
+import SwiftUI
+import MLXVision
+
+struct ImageSegmentationView: View {
+
+    @State var scoreThreshold: Float = 0.5
+    @State var modelRunner: ModelRunner<ImageSegmentationTask, (results: [ImageSegmentationResult], annotatedImage: CIImage)>
+    @Environment(InputSourceState.self) var inputState
+
+    init(model: AnyModelForImageSegmentation) {
+        let maskAnnotator = MaskAnnotator()
+        self.modelRunner = ModelRunner(model: model) { input, results in
+            let results = results.top(5)
+            let annotatedImage = maskAnnotator.annotate(image: input.image, detections: results)
+            return (results, annotatedImage)
+        }
+    }
+
+    var body: some View {
+        AdaptiveStack {
+            Section("Input") {
+                InputSourceView()
+            }
+
+            Section("Options") {
+                ThresholdSlider(
+                    title: "Score Threshold",
+                    description: "Higher values show only more confident segments",
+                    value: $scoreThreshold
+                )
+            }
+        } content: {
+            Section("Results") {
+                ImagePlaceholder(
+                    image: modelRunner.result?.annotatedImage,
+                    emptyTitle: "Segmentation Results",
+                    emptySystemImage: "square.stack.3d.up",
+                    emptyDescription: "Run inference to see mask overlays"
+                )
+            }
+        } footer: {
+            Section {
+                DetectionsView(results: modelRunner.result?.results ?? [])
+            }
+            Section("Performance") {
+                PerformanceView(performance: modelRunner.performance)
+            }
+        }
+        .task(id: [scoreThreshold.description]) {
+            await submit(debounce: true)
+        }
+        .task(id: inputState.image) {
+            await submit()
+        }
+    }
+
+    func submit(debounce: Bool = false) async {
+        guard let image = inputState.image else {
+            return
+        }
+
+        let request = ImageSegmentationRequest(image: image, scoreThreshold: scoreThreshold)
+        await modelRunner.submit(request, debounce: debounce)
+    }
+}

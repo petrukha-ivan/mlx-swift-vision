@@ -1,0 +1,223 @@
+[
+  {
+    "text": "",
+    "tokens": [
+      49406,
+      49407
+    ]
+  },
+  {
+    "text": "hello world",
+    "tokens": [
+      49406,
+      3306,
+      1002,
+      49407
+    ]
+  },
+  {
+    "text": "  hello   world  ",
+    "tokens": [
+      49406,
+      3306,
+      1002,
+      49407
+    ]
+  },
+  {
+    "text": "hello, world!",
+    "tokens": [
+      49406,
+      3306,
+      267,
+      1002,
+      256,
+      49407
+    ]
+  },
+  {
+    "text": "a photo of a cat",
+    "tokens": [
+      49406,
+      320,
+      1125,
+      539,
+      320,
+      2368,
+      49407
+    ]
+  },
+  {
+    "text": "a photo of a dog running on grass",
+    "tokens": [
+      49406,
+      320,
+      1125,
+      539,
+      320,
+      1929,
+      2761,
+      525,
+      5922,
+      49407
+    ]
+  },
+  {
+    "text": "a close-up photo of a sunflower",
+    "tokens": [
+      49406,
+      320,
+      2660,
+      268,
+      705,
+      1125,
+      539,
+      320,
+      21559,
+      49407
+    ]
+  },
+  {
+    "text": "a red car parked near a blue house",
+    "tokens": [
+      49406,
+      320,
+      736,
+      1615,
+      16487,
+      2252,
+      320,
+      1746,
+      1212,
+      49407
+    ]
+  },
+  {
+    "text": "a cup of coffee on a wooden table",
+    "tokens": [
+      49406,
+      320,
+      1937,
+      539,
+      2453,
+      525,
+      320,
+      9057,
+      2175,
+      49407
+    ]
+  },
+  {
+    "text": "a laptop next to a notebook and pen",
+    "tokens": [
+      49406,
+      320,
+      10464,
+      1131,
+      531,
+      320,
+      16365,
+      537,
+      5356,
+      49407
+    ]
+  },
+  {
+    "text": "two dogs playing in the snow",
+    "tokens": [
+      49406,
+      1237,
+      3255,
+      1629,
+      530,
+      518,
+      2583,
+      49407
+    ]
+  },
+  {
+    "text": "a portrait of a smiling person in natural light",
+    "tokens": [
+      49406,
+      320,
+      5352,
+      539,
+      320,
+      9200,
+      2533,
+      530,
+      3288,
+      1395,
+      49407
+    ]
+  },
+  {
+    "text": "a black and white sketch of a city street",
+    "tokens": [
+      49406,
+      320,
+      1449,
+      537,
+      1579,
+      5269,
+      539,
+      320,
+      1305,
+      2012,
+      49407
+    ]
+  },
+  {
+    "text": "sunset over the ocean with orange clouds",
+    "tokens": [
+      49406,
+      3424,
+      962,
+      518,
+      4918,
+      593,
+      4287,
+      6244,
+      49407
+    ]
+  },
+  {
+    "text": "a product photo on a white background",
+    "tokens": [
+      49406,
+      320,
+      4306,
+      1125,
+      525,
+      320,
+      1579,
+      5994,
+      49407
+    ]
+  },
+  {
+    "text": "the quick brown fox jumps over the lazy dog",
+    "tokens": [
+      49406,
+      518,
+      3712,
+      2866,
+      3240,
+      18911,
+      962,
+      518,
+      10753,
+      1929,
+      49407
+    ]
+  },
+  {
+    "text": "don't",
+    "tokens": [
+      49406,
+      847,
+      713,
+      49407
+    ]
+  }
+]
