@@ -90,7 +90,16 @@ extension ModelRegistry {
                 let textTokenizer = try CLIPTokenizer.from(url: url)
                 let processor = CLIPEmbeddingsProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
                 return AnyModelForEmbeddingsExtraction(model: model, processor: processor)
-            }
+            },
+            "siglip": { url, overrides in
+                let modelConfig = try SigLIPConfig.decoded(from: url.modelConfig)
+                let model = SigLIPEmbeddingsModel(modelConfig)
+                let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
+                let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
+                let textTokenizer = try SigLIPTokenizer.from(url: url)
+                let processor = SigLIPEmbeddingsProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
+                return AnyModelForEmbeddingsExtraction(model: model, processor: processor)
+            },
         ])
     }
 
@@ -104,7 +113,16 @@ extension ModelRegistry {
                 let textTokenizer = try CLIPTokenizer.from(url: url)
                 let processor = CLIPProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
                 return AnyModelForZeroShotClassification(model: model, processor: processor)
-            }
+            },
+            "siglip": { url, overrides in
+                let modelConfig = try SigLIPConfig.decoded(from: url.modelConfig)
+                let model = SigLIPModel(modelConfig)
+                let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
+                let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
+                let textTokenizer = try SigLIPTokenizer.from(url: url)
+                let processor = SigLIPProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
+                return AnyModelForZeroShotClassification(model: model, processor: processor)
+            },
         ])
     }
 
