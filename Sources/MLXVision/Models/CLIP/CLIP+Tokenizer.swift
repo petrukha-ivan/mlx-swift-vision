@@ -51,7 +51,7 @@ class CLIPTokenizer {
         return [bos] + tokens.compactMap({ vocabulary[$0] }) + [eos]
     }
 
-    private func tokenize(word: String) -> [String] {
+    func tokenize(word: String) -> [String] {
         var tokens = word.map { String($0) }
         let last = tokens.removeLast()
         tokens.append("\(last)</w>")

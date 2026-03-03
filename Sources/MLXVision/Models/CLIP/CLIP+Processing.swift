@@ -22,7 +22,8 @@ final class CLIPProcessor: Processor {
         let tokens = input.labels.map(textTokenizer.encode)
         let paddingLength = tokens.reduce(1, { max($0, $1.count) })
         let paddedTokens = MLX.stacked(tokens.map { MLXArray($0 + Array(repeating: textTokenizer.eos, count: paddingLength - $0.count)) })
-        let textInput = TextInput(textTokens: paddedTokens, textMask: .ones(like: paddedTokens))
+        let textMask = paddedTokens .!= textTokenizer.eos
+        let textInput = TextInput(textTokens: paddedTokens, textMask: textMask)
         let imageInput = try imagePreprocessor.preprocess(image: input.image)
         return MultimodalInput(
             textInput: textInput,
