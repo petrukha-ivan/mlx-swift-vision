@@ -22,18 +22,18 @@ let package = Package(
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad,
-                .phone
+                .phone,
             ],
             supportedInterfaceOrientations: [
                 .portrait,
-                .portraitUpsideDown(.when(deviceFamilies: [.pad]))
+                .portraitUpsideDown(.when(deviceFamilies: [.pad])),
             ],
             capabilities: [
                 .camera(purposeString: "Camera Processing"),
                 .photoLibrary(purposeString: "Photo Processing"),
                 .incomingNetworkConnections(),
                 .outgoingNetworkConnections(),
-                .fileAccess(.userSelectedFiles, mode: .readWrite)
+                .fileAccess(.userSelectedFiles, mode: .readWrite),
             ],
             appCategory: .developerTools
         )

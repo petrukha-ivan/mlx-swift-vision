@@ -17,7 +17,6 @@ struct ImageSegmentationView: View {
     init(model: AnyModelForImageSegmentation) {
         let maskAnnotator = MaskAnnotator()
         self.modelRunner = ModelRunner(model: model) { input, results in
-            let results = results.top(5)
             let annotatedImage = maskAnnotator.annotate(image: input.image, detections: results)
             return (results, annotatedImage)
         }
@@ -28,7 +27,6 @@ struct ImageSegmentationView: View {
             Section("Input") {
                 InputSourceView()
             }
-
             Section("Options") {
                 ThresholdSlider(
                     title: "Score Threshold",
@@ -46,9 +44,6 @@ struct ImageSegmentationView: View {
                 )
             }
         } footer: {
-            Section {
-                DetectionsView(results: modelRunner.result?.results ?? [])
-            }
             Section("Performance") {
                 PerformanceView(performance: modelRunner.performance)
             }

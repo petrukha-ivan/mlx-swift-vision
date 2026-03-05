@@ -18,7 +18,6 @@ struct ObjectDetectionView: View {
         let boxAnnotator = BoxAnnotator()
         let labelAnnotator = LabelAnnotator()
         self.modelRunner = ModelRunner(model: model) { input, results in
-            let results = results.top(5)
             let boxedImage = boxAnnotator.annotate(image: input.image, detections: results)
             let annotatedImage = labelAnnotator.annotate(image: boxedImage, detections: results)
             return (results, annotatedImage)
@@ -30,7 +29,6 @@ struct ObjectDetectionView: View {
             Section("Input") {
                 InputSourceView()
             }
-
             Section("Options") {
                 ThresholdSlider(
                     title: "Score Threshold",
@@ -48,9 +46,6 @@ struct ObjectDetectionView: View {
                 )
             }
         } footer: {
-            Section {
-                DetectionsView(results: modelRunner.result?.results ?? [])
-            }
             Section("Performance") {
                 PerformanceView(performance: modelRunner.performance)
             }

@@ -59,9 +59,6 @@ struct ZeroShotSegmentationView: View {
                 )
             }
         } footer: {
-            Section {
-                DetectionsView(results: modelRunner.result?.results ?? [])
-            }
             Section("Performance") {
                 PerformanceView(performance: modelRunner.performance)
             }
