@@ -26,11 +26,17 @@ final class DetrModelForObjectDetection: Module, Predictor {
         _classLabelsClassifier.wrappedValue = Linear(config.dimensions, config.id2label.count + 1)
     }
 
-    func predict(_ input: ImageInput) throws -> Output {
-        let outputs = model(input.pixelValues).decoderOutputs
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let pixelValues = inputs[0]
+        let outputs = model(pixelValues).decoderOutputs
         let logits = classLabelsClassifier(outputs)
         let boxes = bboxPredictor(outputs).sigmoid().squeezed()
-        return (logits, boxes)
+        return [logits, boxes]
+    }
+
+    func predict(_ input: ImageInput) throws -> Output {
+        let outputs = _predict([input.pixelValues])
+        return (outputs[0], outputs[1])
     }
 }
 
@@ -62,8 +68,9 @@ final class DetrModelForImageSegmentation: Module, Predictor {
         }
     }
 
-    func predict(_ input: ImageInput) throws -> Output {
-        let outputs = model(input.pixelValues)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let pixelValues = inputs[0]
+        let outputs = model(pixelValues)
         let features = outputs.features
         let featureMask = outputs.featureMask
         let (B, H, W) = featureMask.shape3
@@ -71,7 +78,12 @@ final class DetrModelForImageSegmentation: Module, Predictor {
         let bboxMask = bboxAttention(queries: outputs.decoderOutputs, keys: outputs.encoderOutputs.reshaped(B, H, W, -1), mask: featureMask)
         let fpnFeatures = [features[2], features[1], features[0]]
         let segMask = maskHead(outputs.projectedFeatures, bboxAttention: bboxMask, fpns: fpnFeatures).squeezed()
-        return (input.pixelValues, logits, segMask)
+        return [logits, segMask]
+    }
+
+    func predict(_ input: ImageInput) throws -> Output {
+        let outputs = _predict([input.pixelValues])
+        return (input.pixelValues, outputs[0], outputs[1])
     }
 }
 
@@ -94,7 +106,6 @@ final class DetrModel: Module {
     @ModuleInfo(key: "_query_indices") var queryIndices: MLXArray
 
     init(_ config: DetrConfig) {
-
         backbone = DetrConvModel(config)
         encoder = DetrEncoder(config)
         decoder = DetrDecoder(config)

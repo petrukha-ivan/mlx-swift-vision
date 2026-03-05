@@ -29,23 +29,32 @@ class ImagePreprocessor {
             }
 
         let size = image.extent.size
-        let h = Int(size.height.rounded())
-        let w = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+        let width = Int(size.width.rounded())
 
         let format = CIFormat.RGBA8
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
 
-        let rowBytes = w * 4
-        var bitmapData = Data(count: h * rowBytes)
+        let rowBytes = width * 4
+        var bitmapData = Data(count: height * rowBytes)
         bitmapData.withUnsafeMutableBytes { buffer in
             context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: format, colorSpace: colorSpace)
             context.clearCaches()
         }
 
+        let pixels = MLXArray(bitmapData, [height, width, 4], dtype: .int8)
+        let (pixelValues, pixelMask) = preprocess(pixels: pixels)
+
+        return ImageInput(
+            pixelValues: pixelValues,
+            pixelMask: pixelMask
+        )
+    }
+
+    private lazy var _preprocess = MLX.compile { [unowned self] inputs in
         let mean = config.imageMean.asMLXArray(dtype: .float32)
         let std = config.imageStd.asMLXArray(dtype: .float32)
-        var pixelValues = MLXArray(bitmapData, [h, w, 4], dtype: .uint8)
-        pixelValues = pixelValues[0..., 0..., ..<3]
+        var pixelValues = inputs[0][0..., 0..., ..<3]
         pixelValues = pixelValues / 255.0
         pixelValues = (pixelValues - mean) / std
         pixelValues = pixelValues.expandedDimensions(axis: 0)
@@ -56,9 +65,13 @@ class ImagePreprocessor {
             pixelMask = pixelMask.asType(dtype)
         }
 
-        return ImageInput(
-            pixelValues: pixelValues,
-            pixelMask: pixelMask
-        )
+        return [pixelValues, pixelMask]
+    }
+
+    func preprocess(pixels: MLXArray) -> (MLXArray, MLXArray) {
+        let outputs = _preprocess([pixels])
+        let pixelValues = outputs[0]
+        let pixelMask = outputs[1]
+        return (pixelValues, pixelMask)
     }
 }
