@@ -42,7 +42,7 @@ class ImagePreprocessor {
             context.clearCaches()
         }
 
-        let pixels = MLXArray(bitmapData, [height, width, 4], dtype: .int8)
+        let pixels = MLXArray(bitmapData, [height, width, 4], dtype: .uint8)
         let (pixelValues, pixelMask) = preprocess(pixels: pixels)
 
         return ImageInput(

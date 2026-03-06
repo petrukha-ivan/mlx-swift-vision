@@ -10,7 +10,7 @@ import MLXVision
 
 struct ObjectDetectionView: View {
 
-    @State var scoreThreshold: Float = 0.5
+    @State var scoreThreshold: Float = 0.75
     @State var modelRunner: ModelRunner<ObjectDetectionTask, (results: [ObjectDetectionResult], annotatedImage: CIImage)>
     @Environment(InputSourceState.self) var inputState
 

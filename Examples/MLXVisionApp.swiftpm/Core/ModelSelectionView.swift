@@ -86,6 +86,8 @@ extension ModelSelection {
         ModelSelection(id: "facebook/detr-resnet-50", revision: "main", type: .objectDetection, inputSize: 448),
         ModelSelection(id: "facebook/detr-resnet-101", revision: "main", type: .objectDetection),
         ModelSelection(id: "facebook/detr-resnet-101", revision: "main", type: .objectDetection, inputSize: 448),
+        ModelSelection(id: "ipetrukha/rf-detr-nano", revision: "main", type: .objectDetection),
+        ModelSelection(id: "ipetrukha/rf-detr-small", revision: "main", type: .objectDetection),
         ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .imageSegmentation),
         ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .imageSegmentation, inputSize: 448),
         ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .imageSegmentation),

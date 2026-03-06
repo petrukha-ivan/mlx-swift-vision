@@ -10,7 +10,7 @@ import MLXVision
 
 struct ImageSegmentationView: View {
 
-    @State var scoreThreshold: Float = 0.5
+    @State var scoreThreshold: Float = 0.75
     @State var modelRunner: ModelRunner<ImageSegmentationTask, (results: [ImageSegmentationResult], annotatedImage: CIImage)>
     @Environment(InputSourceState.self) var inputState
 

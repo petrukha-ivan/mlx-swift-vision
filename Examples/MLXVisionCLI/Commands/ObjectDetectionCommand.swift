@@ -20,6 +20,9 @@ struct ObjectDetectionCommand: AsyncParsableCommand {
     @OptionGroup
     var commonOptions: CommonOptions
 
+    @OptionGroup
+    var benchmarkOptions: BenchmarkOptions
+
     @Option
     var scoreThreshold: Float = 0.5
 
@@ -27,10 +30,20 @@ struct ObjectDetectionCommand: AsyncParsableCommand {
         let image = commonOptions.image
         let model = try await ModelFactory.shared.load(commonOptions.modelSource, for: ObjectDetectionTask.self, overrides: commonOptions.overrides)
         let request = ObjectDetectionRequest(image: image, scoreThreshold: scoreThreshold)
+
+        if benchmarkOptions.benchmark {
+            try benchmarkOptions.benchmark {
+                _ = try model.process(request)
+            }
+        }
+
         let detections = try measure("Model processing") { try model.process(request) }
-        var annotatedImage = BoxAnnotator().annotate(image: image, detections: detections)
-        annotatedImage = LabelAnnotator().annotate(image: annotatedImage, detections: detections)
-        try commonOptions.save(annotatedImage)
-        print("Detections: \(detections.count)")
+        print("Top 5 detections: \(detections.top(5))")
+
+        if commonOptions.outputImagePath != nil {
+            var annotatedImage = BoxAnnotator().annotate(image: image, detections: detections)
+            annotatedImage = LabelAnnotator().annotate(image: annotatedImage, detections: detections)
+            try commonOptions.save(annotatedImage)
+        }
     }
 }

@@ -9,6 +9,7 @@ import Foundation
 import ArgumentParser
 import CoreImage
 import MLXVision
+import MLX
 
 @main
 struct RootCommand: AsyncParsableCommand {
@@ -43,6 +44,13 @@ struct CommonOptions: ParsableArguments {
 
     @Option
     var quantizeBits: Int?
+
+    @Flag
+    var disableCompile: Bool = false
+
+    func validate() throws {
+        MLX.compile(enable: !disableCompile)
+    }
 }
 
 extension CommonOptions {
@@ -82,20 +90,25 @@ extension CommonOptions {
     }
 }
 
-func measure<T>(_ label: String, terminator: String = "\n", operation: () async throws -> T) async rethrows -> T {
-    let clock = ContinuousClock()
-    let start = clock.now
-    let value = try await operation()
-    let duration = clock.now - start
-    print("\(label) finished (\(duration.formatted(.units(allowed: [.minutes, .seconds, .milliseconds]))))", terminator: terminator)
-    return value
-}
+struct BenchmarkOptions: ParsableArguments {
 
-func measure<T>(_ label: String, terminator: String = "\n", operation: () throws -> T) rethrows -> T {
-    let clock = ContinuousClock()
-    let start = clock.now
-    let value = try operation()
-    let duration = clock.now - start
-    print("\(label) finished (\(duration.formatted(.units(allowed: [.minutes, .seconds, .milliseconds]))))", terminator: terminator)
-    return value
+    @Flag
+    var benchmark: Bool = false
+
+    func benchmark(
+        warmupSteps: Int = 20,
+        processingSteps: Int = 100,
+        processing: () throws -> Void
+    ) throws {
+        try measure("Warmup") {
+            for _ in 0..<warmupSteps {
+                try processing()
+            }
+        }
+        try measure("Benchmark") {
+            for _ in 0..<processingSteps {
+                try processing()
+            }
+        }
+    }
 }
