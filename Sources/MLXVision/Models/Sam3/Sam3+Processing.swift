@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreImage
 import ReerCodable
 import MLX
 
@@ -57,10 +58,26 @@ final class Sam3Processor: Processor {
                 .squeezed()
         }
 
-        MLX.eval(interpolatedMasks)
         return zip(scores, interpolatedMasks, boxes).map { score, mask, bbox in
-            InstanceSegmentationResult(
-                mask: (mask .>= request.maskThreshold),
+            let (height, width) = mask.shape2
+            let pixelValues = MLX.where(
+                mask .>= request.maskThreshold,
+                MLXArray(255, dtype: .uint8),
+                MLXArray(0, dtype: .uint8)
+            )
+
+            let imageData = pixelValues.asData()
+            let imageSize = CGSize(width: CGFloat(width), height: CGFloat(height))
+            let mask = CIImage(
+                bitmapData: imageData.data,
+                bytesPerRow: width,
+                size: imageSize,
+                format: .L8,
+                colorSpace: CGColorSpace(name: CGColorSpace.linearGray)
+            )
+
+            return InstanceSegmentationResult(
+                mask: mask,
                 label: request.prompt,
                 score: score.item(Float.self)
             )

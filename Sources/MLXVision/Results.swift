@@ -5,7 +5,7 @@
 //  Created by Ivan Petrukha on 07.12.2025.
 //
 
-import MLX
+import CoreImage
 
 public protocol LabeledResult {
     var label: String { get }
@@ -58,14 +58,14 @@ public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredRe
 public struct InstanceSegmentationResult: LabeledResult, ScoredResult {
 
     /// Segmentation mask for the result.
-    public let mask: MLXArray
+    public let mask: CIImage
     /// Predicted label.
     public let label: String
     /// Confidence score for the label.
     public let score: Float
 
     /// Creates an image segmentation result.
-    public init(mask: MLXArray, label: String, score: Float) {
+    public init(mask: CIImage, label: String, score: Float) {
         self.mask = mask
         self.label = label
         self.score = score

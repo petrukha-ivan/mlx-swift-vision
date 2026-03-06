@@ -9,7 +9,6 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 import CoreGraphics
 import CoreText
-import MLX
 
 public class MaskAnnotator {
 
@@ -23,28 +22,18 @@ public class MaskAnnotator {
         var image = image
         for detection in detections {
             let hash = detection.label.hash
-            let mask = detection.mask
-            let (height, width) = mask.shape2
-            let rgba = MLX.ones([height, width, 4], dtype: .uint8) * 255
-            rgba[.ellipsis, 0] = MLXArray(hash & 255)
-            rgba[.ellipsis, 1] = MLXArray((hash >> 8) & 255)
-            rgba[.ellipsis, 2] = MLXArray((hash >> 16) & 255)
-            rgba[.ellipsis, 3] = MLX.which(mask, 255, 0)
-
-            let rgbaData = rgba.asType(.uint8).asData()
-            let annotationImage = CIImage(
-                bitmapData: rgbaData.data,
-                bytesPerRow: width * 4,
-                size: CGSize(width: CGFloat(width), height: CGFloat(height)),
-                format: .RGBA8,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)
+            let color = CIColor(
+                red: CGFloat(hash & 255) / 255.0,
+                green: CGFloat((hash >> 8) & 255) / 255.0,
+                blue: CGFloat((hash >> 16) & 255) / 255.0,
+                alpha: alpha
             )
 
-            let filter = CIFilter.sourceOverCompositing()
+            let filter = CIFilter.blendWithMask()
             filter.backgroundImage = image
-            filter.inputImage =
-                annotationImage
-                .resized(size: image.extent.size)
+            filter.inputImage = CIImage(color: color).cropped(to: image.extent)
+            filter.maskImage = detection.mask
+                .resized(size: image.extent.size, method: .nearest)
                 .transformed(
                     by: CGAffineTransform(
                         translationX: image.extent.origin.x,

@@ -77,8 +77,7 @@ final class DetrForInstanceSegmentationProcessor: Processor {
 
         let targetSize = Array(output.pixelValues.shape.dropFirst().dropLast())
         let interpolatedMasks = zip(scores, masks).map { score, mask in
-            (mask * score)
-                .expandedDimensions(axis: -1)
+            mask.expandedDimensions(axis: -1)
                 .interpolate(size: targetSize, mode: .linear(alignCorners: false))
                 .squeezed()
         }
@@ -90,15 +89,29 @@ final class DetrForInstanceSegmentationProcessor: Processor {
             .argMax(axis: -1)
             .reshaped(targetSize)
 
-        MLX.eval(finalMask)
         return (0..<keep.count).map { i in
-            InstanceSegmentationResult(
-                mask: MLX.equal(finalMask, i),
+            let (height, width) = finalMask.shape2
+            let pixelValues = MLX.where(
+                finalMask .== i,
+                MLXArray(255, dtype: .uint8),
+                MLXArray(0, dtype: .uint8)
+            )
+
+            let imageData = pixelValues.asData()
+            let imageSize = CGSize(width: CGFloat(width), height: CGFloat(height))
+            let mask = CIImage(
+                bitmapData: imageData.data,
+                bytesPerRow: width,
+                size: imageSize,
+                format: .L8,
+                colorSpace: CGColorSpace(name: CGColorSpace.linearGray)
+            )
+
+            return InstanceSegmentationResult(
+                mask: mask,
                 label: labels[i],
                 score: scores[i]
             )
-        }.filter {
-            !$0.label.starts(with: "LABEL_")
         }
     }
 }
