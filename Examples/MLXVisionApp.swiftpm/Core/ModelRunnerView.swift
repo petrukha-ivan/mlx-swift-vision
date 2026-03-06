@@ -19,7 +19,7 @@ enum ModelState {
 enum ModelContainer {
     case imageClassification(AnyModelForImageClassification)
     case objectDetection(AnyModelForObjectDetection)
-    case imageSegmentation(AnyModelForImageSegmentation)
+    case instanceSegmentation(AnyModelForInstanceSegmentation)
     case zeroShotClassification(AnyModelForZeroShotClassification)
     case zeroShotSegmentation(AnyModelForZeroShotSegmentation)
 }
@@ -52,8 +52,8 @@ struct ModelRunnerView: View {
                     ImageClassificationView(model: model)
                 case .objectDetection(let model):
                     ObjectDetectionView(model: model)
-                case .imageSegmentation(let model):
-                    ImageSegmentationView(model: model)
+                case .instanceSegmentation(let model):
+                    InstanceSegmentationView(model: model)
                 case .zeroShotClassification(let model):
                     ZeroShotClassificationView(model: model)
                 case .zeroShotSegmentation(let model):
@@ -106,9 +106,9 @@ struct ModelRunnerView: View {
                 try await .objectDetection(
                     factory.load(source, for: ObjectDetectionTask.self, overrides: overrides, progressHandler: progressHandler)
                 )
-            case .imageSegmentation:
-                try await .imageSegmentation(
-                    factory.load(source, for: ImageSegmentationTask.self, overrides: overrides, progressHandler: progressHandler)
+            case .instanceSegmentation:
+                try await .instanceSegmentation(
+                    factory.load(source, for: InstanceSegmentationTask.self, overrides: overrides, progressHandler: progressHandler)
                 )
             case .zeroShotClassification:
                 try await .zeroShotClassification(

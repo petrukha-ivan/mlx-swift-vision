@@ -47,7 +47,7 @@ final class DetrForObjectDetectionProcessor: Processor {
     }
 }
 
-final class DetrForImageSegmentationProcessor: Processor {
+final class DetrForInstanceSegmentationProcessor: Processor {
 
     private let labels: [String]
     private let numQueries: Int
@@ -59,11 +59,11 @@ final class DetrForImageSegmentationProcessor: Processor {
         self.imagePreprocessor = imagePreprocessor
     }
 
-    func preprocess(_ request: ImageSegmentationRequest) throws -> ImageInput {
+    func preprocess(_ request: InstanceSegmentationRequest) throws -> ImageInput {
         try imagePreprocessor.preprocess(image: request.image)
     }
 
-    func postprocess(_ output: DetrModelForImageSegmentation.Output, _ request: ImageSegmentationRequest) throws -> [ImageSegmentationResult] {
+    func postprocess(_ output: DetrModelForInstanceSegmentation.Output, _ request: InstanceSegmentationRequest) throws -> [InstanceSegmentationResult] {
         let probs = output.logits.softmax(axis: -1)[.ellipsis, 0..<labels.count]
         var scores = probs.max(axis: -1).asArray(Float.self)
         let keep = scores.indices(where: { $0 > request.scoreThreshold })
@@ -92,7 +92,7 @@ final class DetrForImageSegmentationProcessor: Processor {
 
         MLX.eval(finalMask)
         return (0..<keep.count).map { i in
-            ImageSegmentationResult(
+            InstanceSegmentationResult(
                 mask: MLX.equal(finalMask, i),
                 label: labels[i],
                 score: scores[i]

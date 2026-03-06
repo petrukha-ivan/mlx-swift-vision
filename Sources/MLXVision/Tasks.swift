@@ -32,11 +32,11 @@ public enum ObjectDetectionTask: VisionTask {
 }
 
 /// Image segmentation task marker.
-public enum ImageSegmentationTask: VisionTask {
+public enum InstanceSegmentationTask: VisionTask {
     /// Segmentation request input.
-    public typealias Input = ImageSegmentationRequest
+    public typealias Input = InstanceSegmentationRequest
     /// Segmentation outputs.
-    public typealias Output = [ImageSegmentationResult]
+    public typealias Output = [InstanceSegmentationResult]
 }
 
 /// Embeddings extraction task marker.
@@ -60,7 +60,7 @@ public enum ZeroShotSegmentationTask: VisionTask {
     /// Zero-shot segmentation request input.
     public typealias Input = ZeroShotSegmentationRequest
     /// Segmentation outputs.
-    public typealias Output = [ImageSegmentationResult]
+    public typealias Output = [InstanceSegmentationResult]
 }
 
 /// Type-erased classification model pipeline.
@@ -68,10 +68,10 @@ public typealias AnyModelForImageClassification = AnyPipeline<ImageClassificatio
 /// Type-erased object detection model pipeline.
 public typealias AnyModelForObjectDetection = AnyPipeline<ObjectDetectionRequest, [ObjectDetectionResult]>
 /// Type-erased image segmentation model pipeline.
-public typealias AnyModelForImageSegmentation = AnyPipeline<ImageSegmentationRequest, [ImageSegmentationResult]>
+public typealias AnyModelForInstanceSegmentation = AnyPipeline<InstanceSegmentationRequest, [InstanceSegmentationResult]>
 /// Type-erased zero-shot classification model pipeline.
 public typealias AnyModelForZeroShotClassification = AnyPipeline<ZeroShotClassificationRequest, [ClassificationResult]>
 /// Type-erased zero-shot segmentation model pipeline.
-public typealias AnyModelForZeroShotSegmentation = AnyPipeline<ZeroShotSegmentationRequest, [ImageSegmentationResult]>
+public typealias AnyModelForZeroShotSegmentation = AnyPipeline<ZeroShotSegmentationRequest, [InstanceSegmentationResult]>
 /// Type-erased embeddings extraction model pipeline.
 public typealias AnyModelForEmbeddingsExtraction = AnyPipeline<EmbeddingsExtractionRequest, Embeddings>

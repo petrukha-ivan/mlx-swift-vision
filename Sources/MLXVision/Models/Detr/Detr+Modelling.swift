@@ -40,7 +40,7 @@ final class DetrModelForObjectDetection: Module, Predictor {
     }
 }
 
-final class DetrModelForImageSegmentation: Module, Predictor {
+final class DetrModelForInstanceSegmentation: Module, Predictor {
 
     typealias Output = (
         pixelValues: MLXArray,

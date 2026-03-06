@@ -18,7 +18,7 @@ struct RootCommand: AsyncParsableCommand {
         subcommands: [
             ImageClassificationCommand.self,
             ObjectDetectionCommand.self,
-            ImageSegmentationCommand.self,
+            InstanceSegmentationCommand.self,
             ZeroShotClassificationCommand.self,
             ZeroShotSegmentationCommand.self,
         ]

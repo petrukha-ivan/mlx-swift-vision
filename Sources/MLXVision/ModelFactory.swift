@@ -88,7 +88,7 @@ public final class ModelFactory: Sendable {
     private let registries: [ObjectIdentifier: ModelRegistry] = [
         ObjectIdentifier(ImageClassificationTask.self): .classificationModelsRegistry,
         ObjectIdentifier(ObjectDetectionTask.self): .objectDetectionModelsRegistry,
-        ObjectIdentifier(ImageSegmentationTask.self): .imageSegmentationModelsRegistry,
+        ObjectIdentifier(InstanceSegmentationTask.self): .instanceSegmentationModelsRegistry,
         ObjectIdentifier(EmbeddingsExtractionTask.self): .embeddingsExtractionModelsRegistry,
         ObjectIdentifier(ZeroShotClassificationTask.self): .zeroShotClassificationModelsRegistry,
         ObjectIdentifier(ZeroShotSegmentationTask.self): .zeroShotSegmentationModelsRegistry,

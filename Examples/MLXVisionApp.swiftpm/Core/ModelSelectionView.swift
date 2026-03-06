@@ -11,7 +11,7 @@ import MLXVision
 enum ModelType: String, CaseIterable {
     case imageClassification = "Image Classification"
     case objectDetection = "Object Detection"
-    case imageSegmentation = "Image Segmentation"
+    case instanceSegmentation = "Instance Segmentation"
     case zeroShotClassification = "Zero-shot Classification"
     case zeroShotSegmentation = "Zero-shot Segmentation"
 }
@@ -88,10 +88,10 @@ extension ModelSelection {
         ModelSelection(id: "facebook/detr-resnet-101", revision: "main", type: .objectDetection, inputSize: 448),
         ModelSelection(id: "ipetrukha/rf-detr-nano", revision: "main", type: .objectDetection),
         ModelSelection(id: "ipetrukha/rf-detr-small", revision: "main", type: .objectDetection),
-        ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .imageSegmentation),
-        ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .imageSegmentation, inputSize: 448),
-        ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .imageSegmentation),
-        ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .imageSegmentation, inputSize: 448),
+        ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .instanceSegmentation),
+        ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .instanceSegmentation, inputSize: 448),
+        ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .instanceSegmentation),
+        ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .instanceSegmentation, inputSize: 448),
         ModelSelection(id: "openai/clip-vit-base-patch16", revision: "5ef227a78de3f75873f373246dac80def63b0003", type: .zeroShotClassification),
         ModelSelection(id: "openai/clip-vit-base-patch32", revision: "c237dc49a33fc61debc9276459120b7eac67e7ef", type: .zeroShotClassification),
         ModelSelection(id: "facebook/sam3", revision: "main", type: .zeroShotSegmentation),

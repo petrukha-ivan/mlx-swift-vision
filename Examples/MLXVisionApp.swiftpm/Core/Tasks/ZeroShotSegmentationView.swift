@@ -13,7 +13,7 @@ struct ZeroShotSegmentationView: View {
     @State var prompt: String = ""
     @State var scoreThreshold: Float = 0.75
     @State var maskThreshold: Float = 0.5
-    @State var modelRunner: ModelRunner<ZeroShotSegmentationTask, (results: [ImageSegmentationResult], annotatedImage: CIImage)>
+    @State var modelRunner: ModelRunner<ZeroShotSegmentationTask, (results: [InstanceSegmentationResult], annotatedImage: CIImage)>
     @Environment(InputSourceState.self) var inputState
 
     init(model: AnyModelForZeroShotSegmentation) {

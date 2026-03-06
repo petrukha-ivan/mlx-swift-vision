@@ -19,7 +19,7 @@ public class MaskAnnotator {
         self.alpha = alpha
     }
 
-    public func annotate(image: CIImage, detections: [ImageSegmentationResult]) -> CIImage {
+    public func annotate(image: CIImage, detections: [InstanceSegmentationResult]) -> CIImage {
         var image = image
         for detection in detections {
             let hash = detection.label.hash

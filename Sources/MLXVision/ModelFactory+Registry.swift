@@ -75,15 +75,15 @@ extension ModelRegistry {
         ])
     }
 
-    static var imageSegmentationModelsRegistry: ModelRegistry {
+    static var instanceSegmentationModelsRegistry: ModelRegistry {
         ModelRegistry(creators: [
             "detr": { url, overrides in
                 let modelConfig = try DetrForObjectDetectionConfig.decoded(from: url.modelConfig)
-                let model = DetrModelForImageSegmentation(modelConfig)
+                let model = DetrModelForInstanceSegmentation(modelConfig)
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
-                let processor = DetrForImageSegmentationProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForImageSegmentation(model: model, processor: processor)
+                let processor = DetrForInstanceSegmentationProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
+                return AnyModelForInstanceSegmentation(model: model, processor: processor)
             }
         ])
     }

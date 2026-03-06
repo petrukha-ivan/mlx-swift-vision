@@ -8,7 +8,7 @@
 | - | - |
 | Image Classification | ResNet, EfficientNet |
 | Object Detection | DETR |
-| Image Segmentation | DETR |
+| Instance Segmentation | DETR |
 | Zero-shot Classification | CLIP |
 | Zero-shot Segmentation | SAM 3 |
 | Embeddings Extraction | CLIP |
@@ -62,10 +62,10 @@ let result = try model(request).top(1)[0] // Top detection result
 let bbox = result.bbox // Normalized bounding box in (x, y, w, h) format
 ```
 
-### Image Segmentation
+### Instance Segmentation
 
 ```swift
-let request = ImageSegmentationRequest(image: image)
+let request = InstanceSegmentationRequest(image: image)
 let result = try model(request).top(1)[0] // Top segmentation result
 let mask = result.mask // MLXArray with (w, h) shape filled with 0 or 1 values
 ```

@@ -55,7 +55,7 @@ public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredRe
 }
 
 /// Image segmentation result with binary mask and metadata.
-public struct ImageSegmentationResult: LabeledResult, ScoredResult {
+public struct InstanceSegmentationResult: LabeledResult, ScoredResult {
 
     /// Segmentation mask for the result.
     public let mask: MLXArray

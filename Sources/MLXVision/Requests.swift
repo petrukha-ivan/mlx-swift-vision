@@ -41,7 +41,7 @@ public struct ObjectDetectionRequest: ImageBasedRequest {
 }
 
 /// Request for image segmentation.
-public struct ImageSegmentationRequest: ImageBasedRequest {
+public struct InstanceSegmentationRequest: ImageBasedRequest {
 
     /// Input image to segment.
     public let image: CIImage

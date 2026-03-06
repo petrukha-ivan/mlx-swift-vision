@@ -1,5 +1,5 @@
 //
-//  ImageSegmentationView.swift
+//  InstanceSegmentationView.swift
 //  MLX Vision
 //
 //  Created by Ivan Petrukha on 21.02.2026.
@@ -8,13 +8,13 @@
 import SwiftUI
 import MLXVision
 
-struct ImageSegmentationView: View {
+struct InstanceSegmentationView: View {
 
     @State var scoreThreshold: Float = 0.75
-    @State var modelRunner: ModelRunner<ImageSegmentationTask, (results: [ImageSegmentationResult], annotatedImage: CIImage)>
+    @State var modelRunner: ModelRunner<InstanceSegmentationTask, (results: [InstanceSegmentationResult], annotatedImage: CIImage)>
     @Environment(InputSourceState.self) var inputState
 
-    init(model: AnyModelForImageSegmentation) {
+    init(model: AnyModelForInstanceSegmentation) {
         let maskAnnotator = MaskAnnotator()
         self.modelRunner = ModelRunner(model: model) { input, results in
             let annotatedImage = maskAnnotator.annotate(image: input.image, detections: results)
@@ -61,7 +61,7 @@ struct ImageSegmentationView: View {
             return
         }
 
-        let request = ImageSegmentationRequest(image: image, scoreThreshold: scoreThreshold)
+        let request = InstanceSegmentationRequest(image: image, scoreThreshold: scoreThreshold)
         await modelRunner.submit(request, debounce: debounce)
     }
 }
