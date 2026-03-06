@@ -11,6 +11,11 @@ import MLXNN
 
 final class SigLIPModel: Module, Predictor {
 
+    typealias Output = (
+        logits: MLXArray,
+        probs: MLXArray
+    )
+
     @ModuleInfo(key: "text_model") var textModel: SigLIPTextModel
     @ModuleInfo(key: "vision_model") var visionModel: SigLIPVisionModel
     @ParameterInfo(key: "logit_scale") var logitScale: MLXArray
@@ -23,16 +28,25 @@ final class SigLIPModel: Module, Predictor {
         _logitBias.wrappedValue = MLXArray([0])
     }
 
-    func predict(_ input: MultimodalInput) throws -> MLXArray {
-        var textEmbeddings = textModel(input.textInput.textTokens)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let textTokens = inputs[0]
+        let pixelValues = inputs[1]
+
+        var textEmbeddings = textModel(textTokens)
         textEmbeddings /= textEmbeddings.norm()
 
-        var imageEmbeddings = visionModel(input.imageInput.pixelValues)
+        var imageEmbeddings = visionModel(pixelValues)
         imageEmbeddings /= imageEmbeddings.norm()
 
         let logitsPerText = MLX.matmul(textEmbeddings, imageEmbeddings.T) * logitScale.exp() + logitBias
         let logitsPerImage = logitsPerText.T
-        return logitsPerImage
+        let probs = logitsPerImage.squeezed().sigmoid()
+        return [logitsPerImage, probs]
+    }
+
+    func predict(_ input: MultimodalInput) throws -> Output {
+        let outputs = _predict([input.textInput.textTokens, input.imageInput.pixelValues])
+        return (outputs[0], outputs[1])
     }
 }
 
@@ -55,16 +69,28 @@ final class SigLIPEmbeddingsModel: Module, Predictor {
         _logitBias.wrappedValue = MLXArray(0.0)
     }
 
+    private lazy var _predictText = MLX.compile { [unowned self] inputs in
+        let tokens = inputs[0]
+        var textEmbeddings = textModel(tokens)
+        textEmbeddings /= textEmbeddings.norm()
+        return [textEmbeddings]
+    }
+
+    private lazy var _predictImage = MLX.compile { [unowned self] inputs in
+        let pixelValues = inputs[0]
+        var imageEmbeddings = visionModel(pixelValues)
+        imageEmbeddings /= imageEmbeddings.norm()
+        return [imageEmbeddings]
+    }
+
     func predict(_ input: Input) throws -> MLXArray {
         switch input {
         case .text(let tokens):
-            var textEmbeddings = textModel(tokens)
-            textEmbeddings /= textEmbeddings.norm()
-            return textEmbeddings
+            let outputs = _predictText([tokens])
+            return outputs[0]
         case .image(let pixelValues):
-            var imageEmbeddings = visionModel(pixelValues)
-            imageEmbeddings /= imageEmbeddings.norm()
-            return imageEmbeddings
+            let outputs = _predictImage([pixelValues])
+            return outputs[0]
         }
     }
 }

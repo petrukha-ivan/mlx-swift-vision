@@ -11,6 +11,11 @@ import MLX
 
 final class CLIPModel: Module, Predictor {
 
+    typealias Output = (
+        logits: MLXArray,
+        probs: MLXArray
+    )
+
     @ModuleInfo(key: "text_model") var textModel: CLIPTextModel
     @ModuleInfo(key: "text_projection") var textProjection: Linear
     @ModuleInfo(key: "vision_model") var visionModel: CLIPVisionModel
@@ -25,19 +30,27 @@ final class CLIPModel: Module, Predictor {
         _logitScale.wrappedValue = MLXArray(config.logitScaleInitValue)
     }
 
-    func predict(_ input: MultimodalInput) throws -> MLXArray {
-        let textOutputs = textModel(input.textInput.textTokens)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let textTokens = inputs[0]
+        let pixelValues = inputs[1]
+
+        let textOutputs = textModel(textTokens)
         var textFeatures = textProjection(textOutputs)
         textFeatures /= textFeatures.norm()
 
-        let visionOutputs = visionModel(input.imageInput.pixelValues)
+        let visionOutputs = visionModel(pixelValues)
         var visionFeatures = visionProjection(visionOutputs)
         visionFeatures /= visionFeatures.norm()
 
         let logitsPerText = MLX.matmul(textFeatures, visionFeatures.T) * logitScale.exp()
         let logitsPerImage = logitsPerText.T
+        let probs = logitsPerImage.squeezed().softmax()
+        return [logitsPerImage, probs]
+    }
 
-        return logitsPerImage
+    func predict(_ input: MultimodalInput) throws -> Output {
+        let outputs = _predict([input.textInput.textTokens, input.imageInput.pixelValues])
+        return (outputs[0], outputs[1])
     }
 }
 
@@ -62,18 +75,30 @@ final class CLIPEmbeddingsModel: Module, Predictor {
         _logitScale.wrappedValue = MLXArray(config.logitScaleInitValue)
     }
 
+    private lazy var _predictText = MLX.compile { [unowned self] inputs in
+        let tokens = inputs[0]
+        let textOutputs = textModel(tokens)
+        var textFeatures = textProjection(textOutputs)
+        textFeatures /= textFeatures.norm()
+        return [textFeatures]
+    }
+
+    private lazy var _predictImage = MLX.compile { [unowned self] inputs in
+        let pixelValues = inputs[0]
+        let visionOutputs = visionModel(pixelValues)
+        var visionFeatures = visionProjection(visionOutputs)
+        visionFeatures /= visionFeatures.norm()
+        return [visionFeatures]
+    }
+
     func predict(_ input: Input) throws -> MLXArray {
         switch input {
         case .text(let tokens):
-            let textOutputs = textModel(tokens)
-            var textFeatures = textProjection(textOutputs)
-            textFeatures /= textFeatures.norm()
-            return textFeatures
+            let outputs = _predictText([tokens])
+            return outputs[0]
         case .image(let pixelValues):
-            let visionOutputs = visionModel(pixelValues)
-            var visionFeatures = visionProjection(visionOutputs)
-            visionFeatures /= visionFeatures.norm()
-            return visionFeatures
+            let outputs = _predictImage([pixelValues])
+            return outputs[0]
         }
     }
 }

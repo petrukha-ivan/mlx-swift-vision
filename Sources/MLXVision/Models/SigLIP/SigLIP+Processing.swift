@@ -33,8 +33,8 @@ final class SigLIPProcessor: Processor {
         )
     }
 
-    func postprocess(_ logits: MLXArray, _ request: ZeroShotClassificationRequest) throws -> [ClassificationResult] {
-        let scores = logits.squeezed().sigmoid().asArray(Float.self)
+    func postprocess(_ output: SigLIPModel.Output, _ request: ZeroShotClassificationRequest) throws -> [ClassificationResult] {
+        let scores = output.probs.asArray(Float.self)
         return zip(request.labels, scores).map { label, score in
             ClassificationResult(
                 label: label,

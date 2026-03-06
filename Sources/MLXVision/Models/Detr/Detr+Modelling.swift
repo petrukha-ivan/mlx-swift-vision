@@ -13,6 +13,7 @@ final class DetrModelForObjectDetection: Module, Predictor {
 
     typealias Output = (
         logits: MLXArray,
+        probs: MLXArray,
         boxes: MLXArray
     )
 
@@ -30,21 +31,21 @@ final class DetrModelForObjectDetection: Module, Predictor {
         let pixelValues = inputs[0]
         let outputs = model(pixelValues).decoderOutputs
         let logits = classLabelsClassifier(outputs)
+        let probs = logits.softmax(axis: -1)
         let boxes = bboxPredictor(outputs).sigmoid().squeezed()
-        return [logits, boxes]
+        return [logits, probs, boxes]
     }
 
     func predict(_ input: ImageInput) throws -> Output {
         let outputs = _predict([input.pixelValues])
-        return (outputs[0], outputs[1])
+        return (outputs[0], outputs[1], outputs[2])
     }
 }
 
 final class DetrModelForInstanceSegmentation: Module, Predictor {
 
     typealias Output = (
-        pixelValues: MLXArray,
-        logits: MLXArray,
+        probs: MLXArray,
         segmentationMask: MLXArray
     )
 
@@ -75,15 +76,22 @@ final class DetrModelForInstanceSegmentation: Module, Predictor {
         let featureMask = outputs.featureMask
         let (B, H, W) = featureMask.shape3
         let logits = classLabelsClassifier(outputs.decoderOutputs)
+        let probs = logits.softmax(axis: -1)
         let bboxMask = bboxAttention(queries: outputs.decoderOutputs, keys: outputs.encoderOutputs.reshaped(B, H, W, -1), mask: featureMask)
         let fpnFeatures = [features[2], features[1], features[0]]
         let segMask = maskHead(outputs.projectedFeatures, bboxAttention: bboxMask, fpns: fpnFeatures).squeezed()
-        return [logits, segMask]
+        
+        let targetSize = Array(pixelValues.shape.dropFirst().dropLast())
+        let interpolatedMask = segMask.expandedDimensions(axis: -1)
+            .interpolate(size: targetSize, mode: .linear(alignCorners: false))
+            .squeezed()
+        
+        return [probs, interpolatedMask]
     }
 
     func predict(_ input: ImageInput) throws -> Output {
         let outputs = _predict([input.pixelValues])
-        return (input.pixelValues, outputs[0], outputs[1])
+        return (outputs[0], outputs[1])
     }
 }
 

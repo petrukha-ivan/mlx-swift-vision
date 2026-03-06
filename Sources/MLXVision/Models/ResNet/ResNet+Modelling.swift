@@ -11,6 +11,11 @@ import ReerCodable
 
 final class ResNetModelForImageClassification: Module, Predictor {
 
+    typealias Output = (
+        logits: MLXArray,
+        probs: MLXArray
+    )
+
     @ModuleInfo var resnet: ResNetModel
     @ModuleInfo var classifier: Linear
 
@@ -25,10 +30,16 @@ final class ResNetModelForImageClassification: Module, Predictor {
         }
     }
 
-    func predict(_ input: ImageInput) throws -> MLXArray {
-        let hidden = resnet(input.pixelValues)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let hidden = resnet(inputs[0])
         let logits = classifier(hidden).squeezed()
-        return logits
+        let probs = logits.softmax()
+        return [logits, probs]
+    }
+
+    func predict(_ input: ImageInput) throws -> Output {
+        let outputs = _predict([input.pixelValues])
+        return (outputs[0], outputs[1])
     }
 }
 

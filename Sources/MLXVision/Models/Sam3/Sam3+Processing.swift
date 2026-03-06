@@ -41,24 +41,15 @@ final class Sam3Processor: Processor {
     }
 
     func postprocess(_ output: Sam3Model.Output, _ request: ZeroShotSegmentationRequest) throws -> [InstanceSegmentationResult] {
-        let logits = output.predLogits.sigmoid()
-        let keep = MLXArray(logits.asArray(Float.self).indices(where: { $0 > request.scoreThreshold }))
+        let keep = MLXArray(output.predProbs.asArray(Float.self).indices(where: { $0 > request.scoreThreshold }))
         guard keep.count > 0 else {
             return []
         }
 
-        let scores = logits[0, keep].split(parts: keep.count)
-        let boxes = output.predBoxes[0, keep].split(parts: keep.count)
-        let masks = output.predMasks.sigmoid()[0, keep].split(parts: keep.count)
+        let scores = output.predProbs[0, keep].split(parts: keep.count)
+        let masks = output.predMasks[0, keep].split(parts: keep.count)
 
-        let targetSize = Array(output.pixelValues.shape.dropFirst().dropLast())
-        let interpolatedMasks = masks.map { mask in
-            mask.expandedDimensions(axis: -1)
-                .interpolate(size: targetSize, mode: .linear(alignCorners: false))
-                .squeezed()
-        }
-
-        return zip(scores, interpolatedMasks, boxes).map { score, mask, bbox in
+        return zip(scores, masks).map { score, mask in
             let (height, width) = mask.shape2
             let pixelValues = MLX.where(
                 mask .>= request.maskThreshold,

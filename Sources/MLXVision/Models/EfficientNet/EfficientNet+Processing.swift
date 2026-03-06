@@ -21,8 +21,8 @@ final class EfficientNetProcessor: Processor {
         try imagePreprocessor.preprocess(image: request.image)
     }
 
-    func postprocess(_ logits: MLXArray, _ request: ImageClassificationRequest) throws -> [ClassificationResult] {
-        let scores = logits.softmax().asArray(Float.self)
+    func postprocess(_ output: EfficientNetModelForImageClassification.Output, _ request: ImageClassificationRequest) throws -> [ClassificationResult] {
+        let scores = output.probs.asArray(Float.self)
         return zip(labels, scores).map { label, score in
             ClassificationResult(
                 label: label,

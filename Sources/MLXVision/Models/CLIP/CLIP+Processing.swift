@@ -31,8 +31,8 @@ final class CLIPProcessor: Processor {
         )
     }
 
-    func postprocess(_ logits: MLXArray, _ request: ZeroShotClassificationRequest) throws -> [ClassificationResult] {
-        let scores = logits.squeezed().softmax().asArray(Float.self)
+    func postprocess(_ output: CLIPModel.Output, _ request: ZeroShotClassificationRequest) throws -> [ClassificationResult] {
+        let scores = output.probs.asArray(Float.self)
         return zip(request.labels, scores).map { label, score in
             ClassificationResult(
                 label: label,

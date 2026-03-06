@@ -12,9 +12,8 @@ import MLX
 final class Sam3Model: Module, Predictor {
 
     typealias Output = (
-        pixelValues: MLXArray,
         semanticSeg: MLXArray,
-        predLogits: MLXArray,
+        predProbs: MLXArray,
         predBoxes: MLXArray,
         predMasks: MLXArray
     )
@@ -47,19 +46,23 @@ final class Sam3Model: Module, Predictor {
         }
     }
 
-    func predict(_ input: MultimodalInput) throws -> Output {
-        let visionOutputs = visionEncoder(input.imageInput.pixelValues)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let textTokens = inputs[0]
+        let textMask = inputs[1]
+        let pixelValues = inputs[2]
+
+        let visionOutputs = visionEncoder(pixelValues)
         let visionFeatures = visionOutputs.lastFPNHiddenStates.dropLast()
         let visionPositionEmbeddings = visionOutputs.lastFPNPositionEncodings.dropLast()
 
-        var textFeatures = textEncoder(input.textInput.textTokens, textMask: input.textInput.textMask)
+        var textFeatures = textEncoder(textTokens, textMask: textMask)
         textFeatures = textProjection(textFeatures)
 
         let encoderOutputs = detrEncoder(
             visionFeatures: visionFeatures.last!,
             visionPositionEmbeddings: visionPositionEmbeddings.last!,
             textFeatures: textFeatures,
-            textMask: input.textInput.textMask
+            textMask: textMask
         )
 
         let decoderOutputs = detrDecoder(
@@ -67,7 +70,7 @@ final class Sam3Model: Module, Predictor {
             visionPositionEmbeddings: encoderOutputs.flattenedPositionEmbeddings,
             spatialShapes: encoderOutputs.spatialShapes,
             textFeatures: textFeatures,
-            textMask: input.textInput.textMask
+            textMask: textMask
         )
 
         let maskOutputs = maskDecoder(
@@ -76,22 +79,32 @@ final class Sam3Model: Module, Predictor {
             backboneFeatures: Array(visionFeatures),
             spatialShapes: encoderOutputs.spatialShapes,
             textFeatures: textFeatures,
-            textMask: input.textInput.textMask
+            textMask: textMask
         )
 
         let logits = dotProductScoring(
             decoderHiddenState: decoderOutputs.allHiddenStates,
             textFeatures: textFeatures,
-            textMask: input.textInput.textMask,
+            textMask: textMask
         )
 
-        return (
-            pixelValues: input.imageInput.pixelValues,
-            semanticSeg: maskOutputs.semanticSeg,
-            predLogits: logits,
-            predBoxes: decoderOutputs.predBoxes,
-            predMasks: maskOutputs.predMasks
-        )
+        let predProbs = logits.sigmoid()
+        let masks = maskOutputs.predMasks.sigmoid()
+        let targetSize = Array(pixelValues.shape.dropFirst().dropLast())
+        let (batchSize, queryCount, masksHeight, masksWidth) = masks.shape4
+        let resizedMasks =
+            masks
+            .reshaped(batchSize * queryCount, masksHeight, masksWidth, 1)
+            .interpolate(size: targetSize, mode: .linear(alignCorners: false))
+            .squeezed(axis: -1)
+            .reshaped(batchSize, queryCount, targetSize[0], targetSize[1])
+
+        return [maskOutputs.semanticSeg, predProbs, decoderOutputs.predBoxes, resizedMasks]
+    }
+
+    func predict(_ input: MultimodalInput) throws -> Output {
+        let outputs = _predict([input.textInput.textTokens, input.textInput.textMask, input.imageInput.pixelValues])
+        return (outputs[0], outputs[1], outputs[2], outputs[3])
     }
 }
 

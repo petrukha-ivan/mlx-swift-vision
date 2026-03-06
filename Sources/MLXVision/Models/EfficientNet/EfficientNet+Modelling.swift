@@ -11,6 +11,11 @@ import MLX
 
 final class EfficientNetModelForImageClassification: Module, Predictor {
 
+    typealias Output = (
+        logits: MLXArray,
+        probs: MLXArray
+    )
+
     let efficientnet: EfficientNetModel
     let classifier: Linear
 
@@ -19,10 +24,16 @@ final class EfficientNetModelForImageClassification: Module, Predictor {
         classifier = Linear(config.hiddenDim, config.id2label.count)
     }
 
-    func predict(_ input: ImageInput) throws -> MLXArray {
-        let output = efficientnet(input.pixelValues)
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let output = efficientnet(inputs[0])
         let logits = classifier(output).squeezed()
-        return logits
+        let probs = logits.softmax()
+        return [logits, probs]
+    }
+
+    func predict(_ input: ImageInput) throws -> Output {
+        let outputs = _predict([input.pixelValues])
+        return (outputs[0], outputs[1])
     }
 }
 
