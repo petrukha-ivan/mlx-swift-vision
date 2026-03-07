@@ -26,9 +26,18 @@ struct InstanceSegmentationCommand: AsyncParsableCommand {
         let image = commonOptions.image
         let model = try await ModelFactory.shared.load(commonOptions.modelSource, for: InstanceSegmentationTask.self, overrides: commonOptions.overrides)
         let request = InstanceSegmentationRequest(image: image, scoreThreshold: scoreThreshold)
-        let segments = try measure("Model processing") { try model.process(request) }
-        let annotatedImage = MaskAnnotator().annotate(image: image, detections: segments)
+
+        if benchmarkOptions.benchmark {
+            try benchmarkOptions.benchmark {
+                _ = try model.process(request)
+            }
+        }
+
+        let detections = try measure("Model processing") { try model.process(request) }
+        print("Top 5 detections: \(detections.top(5))")
+
+        let annotator = MaskAnnotator<InstanceSegmentationResult>()
+        let annotatedImage = annotator.annotate(image: image, detections: detections)
         try commonOptions.save(annotatedImage)
-        print("Segments: \(segments.count)")
     }
 }

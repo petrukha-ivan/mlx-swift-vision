@@ -9,7 +9,7 @@ import CoreGraphics
 import CoreImage
 import CoreText
 
-public class LabelAnnotator {
+public class LabelAnnotator<Detection: LabeledResult & BoxedResult>: Annotator {
 
     let fontSize: CGFloat
     let textAttributes: [CFString: Any]
@@ -22,12 +22,12 @@ public class LabelAnnotator {
         self.fontSize = fontSize
         self.textAttributes = [
             kCTFontAttributeName: CTFontCreateWithName("Helvetica" as CFString, fontSize, nil),
-            kCTForegroundColorAttributeName: CGColor(red: 1, green: 1, blue: 1, alpha: 1),
-            kCTBackgroundColorAttributeName: CGColor(red: 0, green: 0, blue: 0, alpha: 1),
+            kCTForegroundColorAttributeName: foregroundColor,
+            kCTBackgroundColorAttributeName: backgroundColor,
         ]
     }
 
-    public func annotate(image: CIImage, detections: [ObjectDetectionResult]) -> CIImage {
+    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
         let canvasSize = CGSize(width: 1024, height: 1024)
         let annotation = CGImage.render(size: canvasSize) { context in
             context.textMatrix = .identity

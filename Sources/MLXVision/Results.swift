@@ -15,6 +15,14 @@ public protocol ScoredResult {
     var score: Float { get }
 }
 
+public protocol BoxedResult {
+    var bbox: [Float] { get }
+}
+
+public protocol MaskedResult {
+    var mask: CIImage { get }
+}
+
 public extension Array where Element: ScoredResult {
     func top(_ k: Int) -> Self {
         Array(sorted(by: { $0.score > $1.score }).prefix(k))
@@ -37,7 +45,7 @@ public struct ClassificationResult: Sendable, Hashable, LabeledResult, ScoredRes
 }
 
 /// Object detection result with normalized geometry and confidence metadata.
-public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredResult {
+public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredResult, BoxedResult {
 
     /// Bounding box in normalized `[x, y, width, height]` coordinates.
     public let bbox: [Float]
@@ -55,7 +63,7 @@ public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredRe
 }
 
 /// Image segmentation result with binary mask and metadata.
-public struct InstanceSegmentationResult: LabeledResult, ScoredResult {
+public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedResult {
 
     /// Segmentation mask for the result.
     public let mask: CIImage

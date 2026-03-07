@@ -8,7 +8,7 @@
 import CoreImage
 import CoreGraphics
 
-public class BoxAnnotator {
+public class BoxAnnotator<Detection: BoxedResult>: Annotator {
 
     let lineWidth: CGFloat
     let strokeColor: CGColor
@@ -21,7 +21,7 @@ public class BoxAnnotator {
         self.strokeColor = strokeColor
     }
 
-    public func annotate(image: CIImage, detections: [ObjectDetectionResult]) -> CIImage {
+    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
         let canvasSize = CGSize(width: 1024, height: 1024)
         let annotation = CGImage.render(size: canvasSize) { context in
             context.setLineWidth(lineWidth)
@@ -50,33 +50,5 @@ public class BoxAnnotator {
             )
 
         return filter.outputImage ?? image
-    }
-}
-
-extension CGImage {
-    static func render(size: CGSize, draw: (CGContext) -> Void) -> CGImage? {
-        let width = Int(size.width)
-        let height = Int(size.height)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-
-        guard
-            let context = CGContext(
-                data: nil,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            )
-        else {
-            return nil
-        }
-
-        context.translateBy(x: 0, y: size.height)
-        context.scaleBy(x: 1, y: -1)
-        draw(context)
-
-        return context.makeImage()
     }
 }

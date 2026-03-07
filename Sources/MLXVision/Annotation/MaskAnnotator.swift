@@ -8,9 +8,8 @@
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import CoreGraphics
-import CoreText
 
-public class MaskAnnotator {
+public class MaskAnnotator<Detection: MaskedResult & LabeledResult>: Annotator {
 
     let alpha: CGFloat
 
@@ -18,7 +17,7 @@ public class MaskAnnotator {
         self.alpha = alpha
     }
 
-    public func annotate(image: CIImage, detections: [InstanceSegmentationResult]) -> CIImage {
+    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
         var image = image
         for detection in detections {
             let hash = detection.label.hash

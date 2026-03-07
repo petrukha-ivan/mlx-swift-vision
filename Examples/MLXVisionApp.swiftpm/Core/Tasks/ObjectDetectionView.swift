@@ -15,11 +15,9 @@ struct ObjectDetectionView: View {
     @Environment(InputSourceState.self) var inputState
 
     init(model: AnyModelForObjectDetection) {
-        let boxAnnotator = BoxAnnotator()
-        let labelAnnotator = LabelAnnotator()
+        let annotator = ComposedAnnotator<ObjectDetectionResult>(BoxAnnotator(), LabelAnnotator())
         self.modelRunner = ModelRunner(model: model) { input, results in
-            let boxedImage = boxAnnotator.annotate(image: input.image, detections: results)
-            let annotatedImage = labelAnnotator.annotate(image: boxedImage, detections: results)
+            let annotatedImage = annotator.annotate(image: input.image, detections: results)
             return (results, annotatedImage)
         }
     }

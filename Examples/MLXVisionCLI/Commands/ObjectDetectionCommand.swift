@@ -40,10 +40,8 @@ struct ObjectDetectionCommand: AsyncParsableCommand {
         let detections = try measure("Model processing") { try model.process(request) }
         print("Top 5 detections: \(detections.top(5))")
 
-        if commonOptions.outputImagePath != nil {
-            var annotatedImage = BoxAnnotator().annotate(image: image, detections: detections)
-            annotatedImage = LabelAnnotator().annotate(image: annotatedImage, detections: detections)
-            try commonOptions.save(annotatedImage)
-        }
+        let annotator = ComposedAnnotator<ObjectDetectionResult>(BoxAnnotator(), LabelAnnotator())
+        let annotatedImage = annotator.annotate(image: image, detections: detections)
+        try commonOptions.save(annotatedImage)
     }
 }

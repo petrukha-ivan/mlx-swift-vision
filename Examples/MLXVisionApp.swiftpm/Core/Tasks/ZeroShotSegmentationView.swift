@@ -17,9 +17,9 @@ struct ZeroShotSegmentationView: View {
     @Environment(InputSourceState.self) var inputState
 
     init(model: AnyModelForZeroShotSegmentation) {
-        let maskAnnotator = MaskAnnotator()
+        let annotator = MaskAnnotator<InstanceSegmentationResult>()
         self.modelRunner = ModelRunner(model: model) { input, results in
-            let annotatedImage = maskAnnotator.annotate(image: input.image, detections: results)
+            let annotatedImage = annotator.annotate(image: input.image, detections: results)
             return (results, annotatedImage)
         }
     }
