@@ -19,6 +19,9 @@ struct InstanceSegmentationCommand: AsyncParsableCommand {
     @OptionGroup
     var commonOptions: CommonOptions
 
+    @OptionGroup
+    var benchmarkOptions: BenchmarkOptions
+
     @Option
     var scoreThreshold: Float = 0.5
 

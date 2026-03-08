@@ -46,11 +46,13 @@ final class Sam3Processor: Processor {
             return []
         }
 
+        let (xMin, yMin, xMax, yMax) = output.predBoxes.squeezed().split(axis: -1)
+        let boxes = MLX.stacked([xMin, yMin, xMax - xMin, yMax - yMin], axis: -1)[keep].split(parts: keep.count)
         let scores = output.predProbs[0, keep].split(parts: keep.count)
         let masks = output.predMasks[0, keep].split(parts: keep.count)
 
-        return zip(scores, masks).map { score, mask in
-            let (height, width) = mask.shape2
+        return zip(scores, masks, boxes).map { score, mask, bbox in
+            let (_, height, width) = mask.shape3
             let pixelValues = MLX.where(
                 mask .>= request.maskThreshold,
                 MLXArray(255, dtype: .uint8),
@@ -69,6 +71,7 @@ final class Sam3Processor: Processor {
 
             return InstanceSegmentationResult(
                 mask: mask,
+                bbox: bbox.asArray(Float.self),
                 label: request.prompt,
                 score: score.item(Float.self)
             )

@@ -71,6 +71,8 @@ final class DetrForInstanceSegmentationProcessor: Processor {
             return []
         }
 
+        let (cx, cy, w, h) = output.boxes.split(axis: -1)
+        let boxes = MLX.stacked([cx - 0.5 * w, cy - 0.5 * h, w, h], axis: -1).split(parts: numQueries)[keep]
         let masks = output.segmentationMask.split(parts: numQueries)[keep].map { $0.squeezed() }
         let labels = probs.argmax(axis: -1).asArray(Int.self)[keep].map({ self.labels[$0] })
         scores = scores[keep]
@@ -102,6 +104,7 @@ final class DetrForInstanceSegmentationProcessor: Processor {
 
             return InstanceSegmentationResult(
                 mask: mask,
+                bbox: boxes[i].asArray(Float.self),
                 label: labels[i],
                 score: scores[i]
             )

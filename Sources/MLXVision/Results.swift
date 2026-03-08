@@ -62,19 +62,22 @@ public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredRe
     }
 }
 
-/// Image segmentation result with binary mask and metadata.
-public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedResult {
+/// Image segmentation result with binary mask, normalized geometry, and metadata.
+public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedResult, BoxedResult {
 
     /// Segmentation mask for the result.
     public let mask: CIImage
+    /// Bounding box in normalized `[x, y, width, height]` coordinates.
+    public let bbox: [Float]
     /// Predicted label.
     public let label: String
     /// Confidence score for the label.
     public let score: Float
 
     /// Creates an image segmentation result.
-    public init(mask: CIImage, label: String, score: Float) {
+    public init(mask: CIImage, bbox: [Float], label: String, score: Float) {
         self.mask = mask
+        self.bbox = bbox
         self.label = label
         self.score = score
     }
