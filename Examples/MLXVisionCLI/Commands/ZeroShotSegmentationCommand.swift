@@ -33,7 +33,7 @@ struct ZeroShotSegmentationCommand: AsyncParsableCommand {
         let image = commonOptions.image
         let model = try await ModelFactory.shared.load(commonOptions.modelSource, for: ZeroShotSegmentationTask.self, overrides: commonOptions.overrides)
         let request = ZeroShotSegmentationRequest(image: image, prompt: prompt, scoreThreshold: scoreThreshold, maskThreshold: maskThreshold)
-        let detections = try measure("Model processing") { try model.process(request) }
+        let detections = try measure("Model processing") { try model(request) }
 
         let annotator = ComposedAnnotator<InstanceSegmentationResult>(MaskAnnotator(), BoxAnnotator(), LabelAnnotator())
         let annotatedImage = annotator.annotate(image: image, detections: detections)

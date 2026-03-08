@@ -26,7 +26,7 @@ struct ZeroShotClassificationCommand: AsyncParsableCommand {
         let image = commonOptions.image
         let model = try await ModelFactory.shared.load(commonOptions.modelSource, for: ZeroShotClassificationTask.self, overrides: commonOptions.overrides)
         let request = ZeroShotClassificationRequest(image: image, labels: labels)
-        let result = try measure("Model processing") { try model.process(request) }
+        let result = try measure("Model processing") { try model(request) }
         print(result)
     }
 }

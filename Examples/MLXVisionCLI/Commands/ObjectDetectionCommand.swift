@@ -33,11 +33,11 @@ struct ObjectDetectionCommand: AsyncParsableCommand {
 
         if benchmarkOptions.benchmark {
             try benchmarkOptions.benchmark {
-                _ = try model.process(request)
+                _ = try model(request)
             }
         }
 
-        let detections = try measure("Model processing") { try model.process(request) }
+        let detections = try measure("Model processing") { try model(request) }
         print("Top 5 detections: \(detections.top(5))")
 
         let annotator = ComposedAnnotator<ObjectDetectionResult>(BoxAnnotator(), LabelAnnotator())

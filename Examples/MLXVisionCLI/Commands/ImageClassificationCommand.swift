@@ -25,7 +25,7 @@ struct ImageClassificationCommand: AsyncParsableCommand {
         let image = commonOptions.image
         let model = try await ModelFactory.shared.load(commonOptions.modelSource, for: ImageClassificationTask.self, overrides: commonOptions.overrides)
         let request = ImageClassificationRequest(image: image)
-        let result = try measure("Model processing") { try model.process(request).top(topK) }
+        let result = try measure("Model processing") { try model(request).top(topK) }
         print(result)
     }
 }
