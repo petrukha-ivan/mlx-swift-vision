@@ -41,7 +41,7 @@ extension ModelRegistry {
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = ResNetProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForImageClassification(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
             "efficientnet": { url, overrides in
                 let modelConfig = try EfficientNetForImageClassificationConfig.decoded(from: url.modelConfig)
@@ -49,7 +49,7 @@ extension ModelRegistry {
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = EfficientNetProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForImageClassification(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
         ])
     }
@@ -62,7 +62,7 @@ extension ModelRegistry {
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = DetrForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForObjectDetection(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
             "rf_detr": { url, overrides in
                 let modelConfig = try RfDetrForObjectDetectionConfig.decoded(from: url.modelConfig)
@@ -70,7 +70,7 @@ extension ModelRegistry {
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = RfDetrForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForObjectDetection(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
         ])
     }
@@ -83,7 +83,7 @@ extension ModelRegistry {
                 let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = DetrForInstanceSegmentationProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
-                return AnyModelForInstanceSegmentation(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             }
         ])
     }
@@ -97,7 +97,7 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let textTokenizer = try CLIPTokenizer.from(url: url)
                 let processor = CLIPEmbeddingsProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
-                return AnyModelForEmbeddingsExtraction(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
             "siglip": { url, overrides in
                 let modelConfig = try SigLIPConfig.decoded(from: url.modelConfig)
@@ -106,7 +106,7 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let textTokenizer = try SigLIPTokenizer.from(url: url)
                 let processor = SigLIPEmbeddingsProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
-                return AnyModelForEmbeddingsExtraction(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
         ])
     }
@@ -120,7 +120,7 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let textTokenizer = try CLIPTokenizer.from(url: url)
                 let processor = CLIPProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
-                return AnyModelForZeroShotClassification(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
             "siglip": { url, overrides in
                 let modelConfig = try SigLIPConfig.decoded(from: url.modelConfig)
@@ -129,7 +129,7 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let textTokenizer = try SigLIPTokenizer.from(url: url)
                 let processor = SigLIPProcessor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
-                return AnyModelForZeroShotClassification(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             },
         ])
     }
@@ -143,7 +143,7 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(processorConfig.imageProcessor, overrides: overrides)
                 let textTokenizer = try CLIPTokenizer.from(url: url)
                 let processor = Sam3Processor(imagePreprocessor: imagePreprocessor, textTokenizer: textTokenizer)
-                return AnyModelForZeroShotSegmentation(model: model, processor: processor)
+                return ModelPipeline(model: model, processor: processor).asAny()
             }
         ])
     }
