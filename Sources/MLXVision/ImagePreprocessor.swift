@@ -32,18 +32,19 @@ class ImagePreprocessor {
         let height = Int(size.height.rounded())
         let width = Int(size.width.rounded())
 
-        let format = CIFormat.RGBA8
+        let format = CIFormat.RGBX8
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
+        let rowBytes = width * 4 * 1
 
-        let rowBytes = width * 4
-        var bitmapData = Data(count: height * rowBytes)
+        let bitmap = MLXArray.zeros([height, width, 4], dtype: .uint8)
+        var bitmapData = bitmap.asData(access: .noCopy).data
         bitmapData.withUnsafeMutableBytes { buffer in
             context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: format, colorSpace: colorSpace)
-            context.clearCaches()
         }
 
-        let pixels = MLXArray(bitmapData, [height, width, 4], dtype: .uint8)
-        let (pixelValues, pixelMask) = preprocess(pixels: pixels)
+        let outputs = _preprocess([bitmap])
+        let pixelValues = outputs[0]
+        let pixelMask = outputs[1]
 
         return ImageInput(
             pixelValues: pixelValues,
@@ -52,8 +53,8 @@ class ImagePreprocessor {
     }
 
     private lazy var _preprocess = MLX.compile { [unowned self] inputs in
-        let mean = config.imageMean.asMLXArray(dtype: .float32)
-        let std = config.imageStd.asMLXArray(dtype: .float32)
+        let mean = MLXArray(config.imageMean)
+        let std = MLXArray(config.imageStd)
         var pixelValues = inputs[0][0..., 0..., ..<3]
         pixelValues = pixelValues / 255.0
         pixelValues = (pixelValues - mean) / std
@@ -66,12 +67,5 @@ class ImagePreprocessor {
         }
 
         return [pixelValues, pixelMask]
-    }
-
-    func preprocess(pixels: MLXArray) -> (MLXArray, MLXArray) {
-        let outputs = _preprocess([pixels])
-        let pixelValues = outputs[0]
-        let pixelMask = outputs[1]
-        return (pixelValues, pixelMask)
     }
 }
