@@ -492,7 +492,7 @@ final class LwDetrVitMLP: Module, UnaryLayer {
     init(_ config: LwDetrVitConfig) {
         _fc1.wrappedValue = Linear(config.hiddenSize, config.hiddenSize * config.mlpRatio)
         _fc2.wrappedValue = Linear(config.hiddenSize * config.mlpRatio, config.hiddenSize)
-        activation = config.hiddenActivationLayer
+        activation = config.hiddenAct.layer
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
@@ -547,7 +547,7 @@ final class LwDetrC2FLayer: Module, UnaryLayer {
             kernelSize: 1,
             stride: 1,
             eps: config.batchNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _conv2.wrappedValue = LwDetrConvNormLayer(
@@ -556,7 +556,7 @@ final class LwDetrC2FLayer: Module, UnaryLayer {
             kernelSize: 1,
             stride: 1,
             eps: config.batchNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _bottlenecks.wrappedValue = (0..<config.c2fNumBlocks).map { _ in
@@ -594,7 +594,7 @@ final class LwDetrRepVggBlock: Module, UnaryLayer {
             kernelSize: 3,
             stride: 1,
             eps: config.batchNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _conv2.wrappedValue = LwDetrConvNormLayer(
@@ -603,7 +603,7 @@ final class LwDetrRepVggBlock: Module, UnaryLayer {
             kernelSize: 3,
             stride: 1,
             eps: config.batchNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
     }
 
@@ -784,7 +784,7 @@ final class LwDetrDecoderMLP: Module, UnaryLayer {
     init(_ config: LwDetrConfig) {
         _linear1.wrappedValue = Linear(config.dModel, config.decoderFfnDim)
         _linear2.wrappedValue = Linear(config.decoderFfnDim, config.dModel)
-        activation = config.decoderActivationLayer
+        activation = config.decoderActivationFunction.layer
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
@@ -1004,45 +1004,6 @@ final class LwDetrMLPPredictionHead: Module, UnaryLayer {
                 activation($1($0))
             }
         )
-    }
-}
-
-private extension LwDetrConfig {
-
-    var activationLayer: UnaryLayer {
-        switch activationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
-    }
-
-    var decoderActivationLayer: UnaryLayer {
-        switch decoderActivationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
-    }
-}
-
-private extension LwDetrVitConfig {
-
-    var hiddenActivationLayer: UnaryLayer {
-        switch hiddenAct {
-        case "relu":
-            ReLU()
-        case "silu":
-            SiLU()
-        default:
-            GELU(approximation: .none)
-        }
     }
 }
 

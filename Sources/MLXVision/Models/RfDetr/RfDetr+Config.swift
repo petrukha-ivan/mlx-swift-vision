@@ -69,7 +69,7 @@ class RfDetrConfig {
     var c2fNumBlocks: Int = 3
 
     @CodingKey("activation_function")
-    var activationFunction: String = "silu"
+    var activationFunction: ActivationType = .silu
 
     @CodingKey("layer_norm_eps")
     var layerNormEps: Float = 1e-5
@@ -93,7 +93,7 @@ class RfDetrConfig {
     var decoderCrossAttentionHeads: Int = 16
 
     @CodingKey("decoder_activation_function")
-    var decoderActivationFunction: String = "relu"
+    var decoderActivationFunction: ActivationType = .relu
 
     @CodingKey("num_feature_levels")
     var numFeatureLevels: Int = 1

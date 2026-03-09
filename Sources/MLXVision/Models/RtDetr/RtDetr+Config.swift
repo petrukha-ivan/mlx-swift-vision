@@ -26,7 +26,7 @@ class RtDetrResNetConfig {
     var layerType: String = "bottleneck"
 
     @CodingKey("hidden_act")
-    var hiddenAct: String = "relu"
+    var hiddenAct: ActivationType = .relu
 
     @CodingKey("downsample_in_first_stage")
     var downsampleInFirstStage: Bool = false
@@ -78,10 +78,10 @@ class RtDetrV2Config {
     var positionalEncodingTemperature: Float = 10_000
 
     @CodingKey("encoder_activation_function")
-    var encoderActivationFunction: String = "gelu"
+    var encoderActivationFunction: ActivationType = .gelu
 
     @CodingKey("activation_function")
-    var activationFunction: String = "silu"
+    var activationFunction: ActivationType = .silu
 
     @CodingKey("eval_size")
     var evalSize: [Int]? = nil
@@ -117,7 +117,7 @@ class RtDetrV2Config {
     var decoderAttentionHeads: Int = 8
 
     @CodingKey("decoder_activation_function")
-    var decoderActivationFunction: String = "relu"
+    var decoderActivationFunction: ActivationType = .relu
 
     @CodingKey("num_denoising")
     var numDenoising: Int = 100

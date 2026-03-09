@@ -23,7 +23,7 @@ class LwDetrVitConfig {
     var mlpRatio: Int = 4
 
     @CodingKey("hidden_act")
-    var hiddenAct: String = "gelu"
+    var hiddenAct: ActivationType = .gelu
 
     @CodingKey("layer_norm_eps")
     var layerNormEps: Float = 1e-6
@@ -81,7 +81,7 @@ class LwDetrConfig {
     var c2fNumBlocks: Int = 3
 
     @CodingKey("activation_function")
-    var activationFunction: String = "silu"
+    var activationFunction: ActivationType = .silu
 
     @CodingKey("layer_norm_eps")
     var layerNormEps: Float = 1e-5
@@ -108,7 +108,7 @@ class LwDetrConfig {
     var decoderCrossAttentionHeads: Int = 16
 
     @CodingKey("decoder_activation_function")
-    var decoderActivationFunction: String = "relu"
+    var decoderActivationFunction: ActivationType = .relu
 
     @CodingKey("num_feature_levels")
     var numFeatureLevels: Int = 1

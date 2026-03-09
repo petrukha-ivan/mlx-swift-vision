@@ -681,7 +681,7 @@ final class RfDetrC2FLayer: Module, UnaryLayer {
             kernelSize: 1,
             stride: 1,
             eps: config.layerNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _conv2.wrappedValue = RfDetrConvNormLayer(
@@ -690,7 +690,7 @@ final class RfDetrC2FLayer: Module, UnaryLayer {
             kernelSize: 1,
             stride: 1,
             eps: config.layerNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _bottlenecks.wrappedValue = (0..<config.c2fNumBlocks).map { _ in
@@ -728,7 +728,7 @@ final class RfDetrRepVggBlock: Module, UnaryLayer {
             kernelSize: 3,
             stride: 1,
             eps: config.layerNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
 
         _conv2.wrappedValue = RfDetrConvNormLayer(
@@ -737,7 +737,7 @@ final class RfDetrRepVggBlock: Module, UnaryLayer {
             kernelSize: 3,
             stride: 1,
             eps: config.layerNormEps,
-            activation: config.activationLayer
+            activation: config.activationFunction.layer
         )
     }
 
@@ -917,7 +917,7 @@ final class RfDetrDecoderMLP: Module, UnaryLayer {
     init(_ config: RfDetrConfig) {
         _linear1.wrappedValue = Linear(config.dModel, config.decoderFfnDim)
         _linear2.wrappedValue = Linear(config.decoderFfnDim, config.dModel)
-        activation = config.decoderActivationLayer
+        activation = config.decoderActivationFunction.layer
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
@@ -1137,31 +1137,6 @@ final class RfDetrMLPPredictionHead: Module, UnaryLayer {
                 activation($1($0))
             }
         )
-    }
-}
-
-private extension RfDetrConfig {
-
-    var activationLayer: UnaryLayer {
-        switch activationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
-    }
-
-    var decoderActivationLayer: UnaryLayer {
-        switch decoderActivationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
     }
 }
 

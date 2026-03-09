@@ -314,21 +314,21 @@ final class RtDetrResNetEmbeddings: Module {
                 outputChannels: config.embeddingSize / 2,
                 kernelSize: 3,
                 stride: 2,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
             RtDetrResNetConvLayer(
                 inputChannels: config.embeddingSize / 2,
                 outputChannels: config.embeddingSize / 2,
                 kernelSize: 3,
                 stride: 1,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
             RtDetrResNetConvLayer(
                 inputChannels: config.embeddingSize / 2,
                 outputChannels: config.embeddingSize,
                 kernelSize: 3,
                 stride: 1,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
         ]
 
@@ -468,7 +468,7 @@ final class RtDetrResNetBasicLayer: Module, UnaryLayer {
         stride: Int,
         shouldApplyShortcut: Bool
     ) {
-        activation = config.activationLayer
+        activation = config.hiddenAct.layer
 
         if shouldApplyShortcut {
             if inputChannels != outputChannels {
@@ -506,7 +506,7 @@ final class RtDetrResNetBasicLayer: Module, UnaryLayer {
                 outputChannels: outputChannels,
                 kernelSize: 3,
                 stride: stride,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
             RtDetrResNetConvLayer(
                 inputChannels: outputChannels,
@@ -554,7 +554,7 @@ final class RtDetrResNetBottleNeckLayer: Module, UnaryLayer {
         let reduction = 4
         let reducedChannels = outputChannels / reduction
         let shouldApplyShortcut = inputChannels != outputChannels || stride != 1
-        activation = config.activationLayer
+        activation = config.hiddenAct.layer
 
         if stride == 2 {
             shortcut =
@@ -576,14 +576,14 @@ final class RtDetrResNetBottleNeckLayer: Module, UnaryLayer {
                 outputChannels: reducedChannels,
                 kernelSize: 1,
                 stride: config.downsampleInBottleneck ? stride : 1,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
             RtDetrResNetConvLayer(
                 inputChannels: reducedChannels,
                 outputChannels: reducedChannels,
                 kernelSize: 3,
                 stride: config.downsampleInBottleneck ? 1 : stride,
-                activation: config.activationLayer
+                activation: config.hiddenAct.layer
             ),
             RtDetrResNetConvLayer(
                 inputChannels: reducedChannels,
@@ -720,7 +720,7 @@ final class RtDetrV2RepVggBlock: Module, UnaryLayer {
             kernelSize: 1,
             stride: 1
         )
-        activation = config.activationLayer
+        activation = config.activationFunction.layer
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
@@ -737,7 +737,7 @@ final class RtDetrV2CSPRepLayer: Module, UnaryLayer {
 
     init(_ config: RtDetrV2Config) {
         let hiddenChannels = Int(Float(config.encoderHiddenDim) * config.hiddenExpansion)
-        let activation = config.activationLayer
+        let activation = config.activationFunction.layer
 
         _conv1.wrappedValue = RtDetrV2ConvNormLayer(
             config,
@@ -814,7 +814,7 @@ final class RtDetrV2HybridEncoder: Module {
                 outputChannels: config.encoderHiddenDim,
                 kernelSize: 1,
                 stride: 1,
-                activation: config.activationLayer
+                activation: config.activationFunction.layer
             )
         }
 
@@ -829,7 +829,7 @@ final class RtDetrV2HybridEncoder: Module {
                 outputChannels: config.encoderHiddenDim,
                 kernelSize: 3,
                 stride: 2,
-                activation: config.activationLayer
+                activation: config.activationFunction.layer
             )
         }
 
@@ -966,7 +966,7 @@ final class RtDetrV2EncoderLayer: Module {
         _finalLayerNorm.wrappedValue = LayerNorm(dimensions: config.encoderHiddenDim, eps: config.layerNormEps)
 
         normalizeBefore = config.normalizeBefore
-        activation = config.encoderActivationLayer
+        activation = config.encoderActivationFunction.layer
     }
 
     func callAsFunction(
@@ -1177,7 +1177,7 @@ final class RtDetrV2DecoderLayer: Module {
         _linear2.wrappedValue = Linear(config.decoderFfnDim, config.dModel)
         _finalLayerNorm.wrappedValue = LayerNorm(dimensions: config.dModel, eps: config.layerNormEps)
 
-        activation = config.decoderActivationLayer
+        activation = config.decoderActivationFunction.layer
     }
 
     func callAsFunction(
@@ -1471,55 +1471,5 @@ final class RtDetrV2MLPPredictionHead: Module, UnaryLayer {
                 activation($1($0))
             }
         )
-    }
-}
-
-private extension RtDetrResNetConfig {
-
-    var activationLayer: UnaryLayer {
-        switch hiddenAct {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
-    }
-}
-
-private extension RtDetrV2Config {
-
-    var activationLayer: UnaryLayer {
-        switch activationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "relu":
-            ReLU()
-        default:
-            SiLU()
-        }
-    }
-
-    var encoderActivationLayer: UnaryLayer {
-        switch encoderActivationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
-    }
-
-    var decoderActivationLayer: UnaryLayer {
-        switch decoderActivationFunction {
-        case "gelu":
-            GELU(approximation: .none)
-        case "silu":
-            SiLU()
-        default:
-            ReLU()
-        }
     }
 }
