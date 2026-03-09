@@ -72,6 +72,14 @@ extension ModelRegistry {
                 let processor = RfDetrForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
                 return ModelPipeline(model: model, processor: processor).asAny()
             },
+            "rt_detr_v2": { url, overrides in
+                let modelConfig = try RtDetrV2ForObjectDetectionConfig.decoded(from: url.modelConfig)
+                let model = RtDetrV2ModelForObjectDetection(modelConfig)
+                let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
+                let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
+                let processor = RtDetrV2ForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
+                return ModelPipeline(model: model, processor: processor).asAny()
+            },
         ])
     }
 
