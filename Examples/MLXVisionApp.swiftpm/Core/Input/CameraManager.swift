@@ -37,6 +37,11 @@ class CameraManager: NSObject {
     func stop() {
         captureSession.stopRunning()
     }
+
+    deinit {
+        previewStreamContinuation?.finish()
+        previewStreamContinuation = nil
+    }
 }
 
 extension CameraManager {

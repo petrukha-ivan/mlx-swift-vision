@@ -39,13 +39,17 @@ class InputSourceState {
     private let cameraManager = CameraManager()
 
     init() {
-        Task {
+        Task { [weak self, unowned cameraManager] in
             for await frame in cameraManager.previewStream {
-                switch mode {
+                guard let self else {
+                    break
+                }
+
+                switch self.mode {
                 case .image:
                     break
                 case .camera:
-                    image = frame.centerCropped()
+                    self.image = frame.centerCropped()
                 }
             }
         }

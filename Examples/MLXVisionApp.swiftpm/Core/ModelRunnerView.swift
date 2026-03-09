@@ -202,7 +202,7 @@ class ModelRunner<T: VisionTask, Value> {
 
     private func updatePerformance(processingTime: Duration) {
         recentProcessingTimes.append(processingTime)
-        if recentProcessingTimes.count > 100 {
+        if recentProcessingTimes.count > 30 {
             recentProcessingTimes.removeFirst()
         }
 
