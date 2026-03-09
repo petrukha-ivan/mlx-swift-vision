@@ -80,6 +80,14 @@ extension ModelRegistry {
                 let processor = RtDetrV2ForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
                 return ModelPipeline(model: model, processor: processor).asAny()
             },
+            "lw_detr": { url, overrides in
+                let modelConfig = try LwDetrForObjectDetectionConfig.decoded(from: url.modelConfig)
+                let model = LwDetrModelForObjectDetection(modelConfig)
+                let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
+                let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
+                let processor = LwDetrForObjectDetectionProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
+                return ModelPipeline(model: model, processor: processor).asAny()
+            },
         ])
     }
 

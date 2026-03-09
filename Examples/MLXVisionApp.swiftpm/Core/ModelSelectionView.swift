@@ -90,6 +90,8 @@ extension ModelSelection {
         ModelSelection(id: "ipetrukha/rf-detr-small", revision: "main", type: .objectDetection),
         ModelSelection(id: "PekingU/rtdetr_v2_r18vd", revision: "main", type: .objectDetection),
         ModelSelection(id: "PekingU/rtdetr_v2_r50vd", revision: "main", type: .objectDetection),
+        ModelSelection(id: "AnnaZhang/lwdetr_tiny_60e_coco", revision: "main", type: .objectDetection),
+        ModelSelection(id: "AnnaZhang/lwdetr_small_60e_coco", revision: "main", type: .objectDetection),
         ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .instanceSegmentation),
         ModelSelection(id: "facebook/detr-resnet-50-panoptic", revision: "12df956224e66b0faed42e288f43704ddab668ce", type: .instanceSegmentation, inputSize: 448),
         ModelSelection(id: "facebook/detr-resnet-101-panoptic", revision: "main", type: .instanceSegmentation),
