@@ -1,6 +1,6 @@
 //
 //  CGImage+Render.swift
-//  mlx-swift-vision
+//  MLXVision
 //
 //  Created by Ivan Petrukha on 07.03.2026.
 //
