@@ -96,8 +96,8 @@ struct BenchmarkOptions: ParsableArguments {
     var benchmark: Bool = false
 
     func benchmark(
-        warmupSteps: Int = 20,
-        processingSteps: Int = 100,
+        warmupSteps: Int = 100,
+        processingSteps: Int = 1000,
         processing: () throws -> Void
     ) throws {
         try measure("Warmup") {
