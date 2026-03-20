@@ -29,6 +29,7 @@ public class LabelAnnotator<Detection: LabeledResult & BoxedResult>: Annotator {
 
     public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
         let canvasSize = CGSize(width: 1024, height: 1024)
+        let canvasScale = CGAffineTransform(scaleX: canvasSize.width, y: canvasSize.height)
         let annotation = CGImage.render(size: canvasSize) { context in
             context.textMatrix = .identity
             context.translateBy(x: 0, y: canvasSize.height)
@@ -36,7 +37,7 @@ public class LabelAnnotator<Detection: LabeledResult & BoxedResult>: Annotator {
             for detection in detections {
                 let attributedString = CFAttributedStringCreate(kCFAllocatorDefault, detection.label as CFString, textAttributes as CFDictionary)!
                 let textLine = CTLineCreateWithAttributedString(attributedString)
-                let point = CGPoint(x: CGFloat(detection.bbox[0]) * canvasSize.width, y: CGFloat(detection.bbox[1]) * canvasSize.height)
+                let point = detection.bbox.origin.applying(canvasScale)
                 context.textPosition = CGPoint(x: point.x, y: canvasSize.height - point.y - fontSize / 2 - 6)
                 CTLineDraw(textLine, context)
             }

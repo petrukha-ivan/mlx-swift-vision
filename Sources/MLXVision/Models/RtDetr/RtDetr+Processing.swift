@@ -5,6 +5,7 @@
 //  Created by Ivan Petrukha on 08.03.2026.
 //
 
+import CoreGraphics
 import MLX
 
 final class RtDetrV2ForObjectDetectionProcessor: Processor {
@@ -37,8 +38,8 @@ final class RtDetrV2ForObjectDetectionProcessor: Processor {
         scores = scores[keep]
 
         return zip(boxes, labels, scores).map { bbox, label, score in
-            ObjectDetectionResult(
-                bbox: bbox.asArray(Float.self),
+            return ObjectDetectionResult(
+                bbox: CGRect(bbox.asArray(Float.self)),
                 label: label,
                 score: score
             )

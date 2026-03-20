@@ -5,6 +5,7 @@
 //  Created by Ivan Petrukha on 08.03.2026.
 //
 
+import CoreGraphics
 import CoreImage
 import MLX
 
@@ -38,8 +39,8 @@ final class LwDetrForObjectDetectionProcessor: Processor {
         scores = scores[keep]
 
         return zip(boxes, labels, scores).map { bbox, label, score in
-            ObjectDetectionResult(
-                bbox: bbox.asArray(Float.self),
+            return ObjectDetectionResult(
+                bbox: CGRect(bbox.asArray(Float.self)),
                 label: label,
                 score: score
             )

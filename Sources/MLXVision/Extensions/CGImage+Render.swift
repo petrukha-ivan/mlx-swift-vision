@@ -33,3 +33,14 @@ extension CGImage {
         return context.makeImage()
     }
 }
+
+extension CGRect {
+    init(_ values: [Float]) {
+        self.init(
+            x: CGFloat(values[0]),
+            y: CGFloat(values[1]),
+            width: CGFloat(values[2]),
+            height: CGFloat(values[3])
+        )
+    }
+}

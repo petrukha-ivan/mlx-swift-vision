@@ -5,6 +5,7 @@
 //  Created by Ivan Petrukha on 07.12.2025.
 //
 
+import CoreGraphics
 import Foundation
 import CoreImage
 import ReerCodable
@@ -71,7 +72,7 @@ final class Sam3Processor: Processor {
 
             return InstanceSegmentationResult(
                 mask: mask,
-                bbox: bbox.asArray(Float.self),
+                bbox: CGRect(bbox.asArray(Float.self)),
                 label: request.prompt,
                 score: score.item(Float.self)
             )

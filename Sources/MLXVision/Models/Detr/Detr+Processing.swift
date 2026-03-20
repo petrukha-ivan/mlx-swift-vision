@@ -5,6 +5,7 @@
 //  Created by Ivan Petrukha on 09.11.2025.
 //
 
+import CoreGraphics
 import CoreImage
 import MLX
 
@@ -38,8 +39,8 @@ final class DetrForObjectDetectionProcessor: Processor {
         scores = scores[keep]
 
         return zip(boxes, labels, scores).map { bbox, label, score in
-            ObjectDetectionResult(
-                bbox: bbox.asArray(Float.self),
+            return ObjectDetectionResult(
+                bbox: CGRect(bbox.asArray(Float.self)),
                 label: label,
                 score: score
             )
@@ -104,7 +105,7 @@ final class DetrForInstanceSegmentationProcessor: Processor {
 
             return InstanceSegmentationResult(
                 mask: mask,
-                bbox: boxes[i].asArray(Float.self),
+                bbox: CGRect(boxes[i].asArray(Float.self)),
                 label: labels[i],
                 score: scores[i]
             )

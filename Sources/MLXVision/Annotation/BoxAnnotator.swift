@@ -23,18 +23,12 @@ public class BoxAnnotator<Detection: BoxedResult>: Annotator {
 
     public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
         let canvasSize = CGSize(width: 1024, height: 1024)
+        let canvasScale = CGAffineTransform(scaleX: canvasSize.width, y: canvasSize.height)
         let annotation = CGImage.render(size: canvasSize) { context in
             context.setLineWidth(lineWidth)
             context.setStrokeColor(strokeColor)
-            for bbox in detections.map(\.bbox) {
-                context.stroke(
-                    CGRect(
-                        x: CGFloat(bbox[0]) * canvasSize.width,
-                        y: CGFloat(bbox[1]) * canvasSize.height,
-                        width: CGFloat(bbox[2]) * canvasSize.width,
-                        height: CGFloat(bbox[3]) * canvasSize.height
-                    )
-                )
+            for bbox in detections.map({ $0.bbox.applying(canvasScale) }) {
+                context.stroke(bbox)
             }
         }
 

@@ -6,6 +6,7 @@
 //
 
 import CoreImage
+import CoreGraphics
 
 public protocol LabeledResult {
     var label: String { get }
@@ -16,7 +17,7 @@ public protocol ScoredResult {
 }
 
 public protocol BoxedResult {
-    var bbox: [Float] { get }
+    var bbox: CGRect { get }
 }
 
 public protocol MaskedResult {
@@ -47,15 +48,15 @@ public struct ClassificationResult: Sendable, Hashable, LabeledResult, ScoredRes
 /// Object detection result with normalized geometry and confidence metadata.
 public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredResult, BoxedResult {
 
-    /// Bounding box in normalized `[x, y, width, height]` coordinates.
-    public let bbox: [Float]
+    /// Normalized bounding box.
+    public let bbox: CGRect
     /// Predicted label.
     public let label: String
     /// Confidence score for the label.
     public let score: Float
 
     /// Creates an object detection result.
-    public init(bbox: [Float], label: String, score: Float) {
+    public init(bbox: CGRect, label: String, score: Float) {
         self.bbox = bbox
         self.label = label
         self.score = score
@@ -67,15 +68,15 @@ public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedRes
 
     /// Segmentation mask for the result.
     public let mask: CIImage
-    /// Bounding box in normalized `[x, y, width, height]` coordinates.
-    public let bbox: [Float]
+    /// Normalized bounding box.
+    public let bbox: CGRect
     /// Predicted label.
     public let label: String
     /// Confidence score for the label.
     public let score: Float
 
     /// Creates an image segmentation result.
-    public init(mask: CIImage, bbox: [Float], label: String, score: Float) {
+    public init(mask: CIImage, bbox: CGRect, label: String, score: Float) {
         self.mask = mask
         self.bbox = bbox
         self.label = label
