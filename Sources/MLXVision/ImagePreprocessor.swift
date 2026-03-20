@@ -33,13 +33,12 @@ class ImagePreprocessor {
         let width = Int(size.width.rounded())
 
         let format = CIFormat.RGBX8
-        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
         let rowBytes = width * 4 * 1
 
         let bitmap = MLXArray.zeros([height, width, 4], dtype: .uint8)
         var bitmapData = bitmap.asData(access: .noCopy).data
         bitmapData.withUnsafeMutableBytes { buffer in
-            context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: format, colorSpace: colorSpace)
+            context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: format, colorSpace: nil)
         }
 
         let outputs = _preprocess([bitmap])
