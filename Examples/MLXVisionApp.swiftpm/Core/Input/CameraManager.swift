@@ -77,6 +77,7 @@ extension CameraManager {
 
         captureSession.addInput(deviceInput)
         captureSession.addOutput(videoOutput)
+        captureSession.sessionPreset = .hd1280x720
 
         videoOutput.connection(with: .video)?.videoRotationAngle = rotationCoordinator.videoRotationAngleForHorizonLevelCapture
         videoOutput.setSampleBufferDelegate(self, queue: captureOutputQueue)
