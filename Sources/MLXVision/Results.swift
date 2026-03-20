@@ -5,8 +5,9 @@
 //  Created by Ivan Petrukha on 07.12.2025.
 //
 
-import CoreImage
+import Foundation
 import CoreGraphics
+import CoreImage
 
 public protocol LabeledResult {
     var label: String { get }
@@ -45,6 +46,17 @@ public struct ClassificationResult: Sendable, Hashable, LabeledResult, ScoredRes
     }
 }
 
+extension ClassificationResult: CustomStringConvertible {
+    /// A textual representation of this instance.
+    public var description: String {
+        String(
+            format: "ClassificationResult(label: \"%@\", score: %.2f)",
+            label,
+            score
+        )
+    }
+}
+
 /// Object detection result with normalized geometry and confidence metadata.
 public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredResult, BoxedResult {
 
@@ -63,8 +75,23 @@ public struct ObjectDetectionResult: Sendable, Hashable, LabeledResult, ScoredRe
     }
 }
 
+extension ObjectDetectionResult: CustomStringConvertible {
+    /// A textual representation of this instance.
+    public var description: String {
+        String(
+            format: "ObjectDetectionResult(label: \"%@\", score: %.2f, bbox: (x: %.2f, y: %.2f, width: %.2f, height: %.2f))",
+            label,
+            score,
+            bbox.minX,
+            bbox.minY,
+            bbox.width,
+            bbox.height
+        )
+    }
+}
+
 /// Image segmentation result with binary mask, normalized geometry, and metadata.
-public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedResult, BoxedResult {
+public struct InstanceSegmentationResult: Sendable, Hashable, LabeledResult, ScoredResult, MaskedResult, BoxedResult {
 
     /// Segmentation mask for the result.
     public let mask: CIImage
@@ -81,6 +108,23 @@ public struct InstanceSegmentationResult: LabeledResult, ScoredResult, MaskedRes
         self.bbox = bbox
         self.label = label
         self.score = score
+    }
+}
+
+extension InstanceSegmentationResult: CustomStringConvertible {
+    /// A textual representation of this instance.
+    public var description: String {
+        String(
+            format: "InstanceSegmentationResult(label: \"%@\", score: %.2f, bbox: (x: %.2f, y: %.2f, width: %.2f, height: %.2f), mask: %.0fx%.0f)",
+            label,
+            score,
+            bbox.minX,
+            bbox.minY,
+            bbox.width,
+            bbox.height,
+            mask.extent.width,
+            mask.extent.height
+        )
     }
 }
 
