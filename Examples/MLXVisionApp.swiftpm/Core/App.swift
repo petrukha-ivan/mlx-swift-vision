@@ -39,11 +39,6 @@ struct App: SwiftUI.App {
                     .sheet(isPresented: $showSettings) {
                         AppSettingsView()
                     }
-                    #if !targetEnvironment(macCatalyst)
-                        .onAppear {
-                            Memory.cacheLimit = 256 * 1024 * 1024
-                        }
-                    #endif
             }
         }
     }
