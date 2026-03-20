@@ -109,6 +109,12 @@ class RfDetrConfig {
 
     @CodingKey("group_detr")
     var groupDetr: Int = 13
+
+    @CodingKey("mask_downsample_ratio")
+    var maskDownsampleRatio: Int = 4
+
+    @CodingKey("segmentation_bottleneck_ratio")
+    var segmentationBottleneckRatio: Int = 1
 }
 
 @InheritedCodable

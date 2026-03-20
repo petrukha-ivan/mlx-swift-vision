@@ -33,12 +33,72 @@ final class RfDetrModelForObjectDetection: Module, Predictor {
     }
 
     private lazy var _predict = MLX.compile { [unowned self] inputs in
-        let (hiddenStates, referencePoints) = model(inputs[0])
-        let logits = classEmbed(hiddenStates)
+        let outputs = model(inputs[0])
+        let logits = classEmbed(outputs.hiddenStates)
         let probs = logits.softmax(axis: -1)
-        let boxesDelta = bboxEmbed(hiddenStates)
-        var boxes = refineBoxes(referencePoints, boxesDelta)
+        let boxesDelta = bboxEmbed(outputs.hiddenStates)
+        let boxes = refineBoxes(outputs.referencePoints, boxesDelta)
         return [logits, probs, boxes]
+    }
+
+    func predict(_ input: ImageInput) throws -> Output {
+        let outputs = _predict([input.pixelValues])
+        return (outputs[0], outputs[1], outputs[2])
+    }
+}
+
+final class RfDetrModelForInstanceSegmentation: Module, Predictor {
+
+    typealias Output = (
+        probs: MLXArray,
+        boxes: MLXArray,
+        segmentationMask: MLXArray
+    )
+
+    @ModuleInfo var model: RfDetrModel
+    @ModuleInfo(key: "class_embed") var classEmbed: Linear
+    @ModuleInfo(key: "bbox_embed") var bboxEmbed: RfDetrMLPPredictionHead
+    @ModuleInfo(key: "segmentation_head") var segmentationHead: RfDetrSegmentationHead
+
+    private let decoderLayers: Int
+
+    init(_ config: RfDetrForObjectDetectionConfig) {
+        _model.wrappedValue = RfDetrModel(config, numClasses: config.id2label.count)
+        _classEmbed.wrappedValue = Linear(config.dModel, config.id2label.count)
+        _bboxEmbed.wrappedValue = RfDetrMLPPredictionHead(
+            inputDimensions: config.dModel,
+            hiddenDimensions: config.dModel,
+            outputDimensions: 4,
+            layersCount: 3
+        )
+        _segmentationHead.wrappedValue = RfDetrSegmentationHead(config)
+        decoderLayers = config.decoderLayers
+    }
+
+    private lazy var _predict = MLX.compile { [unowned self] inputs in
+        let pixelValues = inputs[0]
+        let outputs = model(pixelValues)
+
+        let logits = classEmbed(outputs.hiddenStates)
+        let probs = logits.sigmoid()
+        let boxesDelta = bboxEmbed(outputs.hiddenStates)
+        let boxes = refineBoxes(outputs.referencePoints, boxesDelta)
+
+        let queryFeatures = outputs.intermediateHiddenStates.split(parts: decoderLayers, axis: 0).map {
+            $0.squeezed(axis: 0)
+        }
+        let masks = segmentationHead(
+            spatialFeatures: outputs.spatialFeatures,
+            queryFeatures: queryFeatures,
+            imageSize: (pixelValues.shape[1], pixelValues.shape[2])
+        )
+
+        let targetSize = Array(pixelValues.shape.dropFirst().dropLast())
+        let interpolatedMask = masks.last!.squeezed().expandedDimensions(axis: -1)
+            .interpolate(size: targetSize, mode: .linear(alignCorners: false))
+            .squeezed()
+
+        return [probs, boxes, interpolatedMask]
     }
 
     func predict(_ input: ImageInput) throws -> Output {
@@ -51,7 +111,9 @@ final class RfDetrModel: Module {
 
     typealias Output = (
         hiddenStates: MLXArray,
-        referencePoints: MLXArray
+        referencePoints: MLXArray,
+        intermediateHiddenStates: MLXArray,
+        spatialFeatures: MLXArray
     )
 
     private let numQueries: Int
@@ -127,7 +189,7 @@ final class RfDetrModel: Module {
         target = MLX.repeated(target, count: batchSize, axis: 0)
 
         let validRatios = MLXArray.ones([batchSize, 1, 2], dtype: sourceFlatten.dtype)
-        let hiddenStates = decoder(
+        let decoderOutputs = decoder(
             inputsEmbeds: target,
             referencePoints: referencePoints,
             validRatios: validRatios,
@@ -135,7 +197,12 @@ final class RfDetrModel: Module {
             encoderHiddenStates: sourceFlatten
         )
 
-        return (hiddenStates, referencePoints)
+        return (
+            hiddenStates: decoderOutputs.hiddenStates,
+            referencePoints: referencePoints,
+            intermediateHiddenStates: decoderOutputs.intermediateHiddenStates,
+            spatialFeatures: projectedFeatures
+        )
     }
 
     private func generateTopKCoords(
@@ -778,7 +845,123 @@ final class RfDetrConvNormLayer: Module, UnaryLayer {
     }
 }
 
+final class RfDetrDepthwiseConvBlock: Module, UnaryLayer {
+
+    @ModuleInfo(key: "dwconv") var depthwiseConvolution: Conv2d
+    @ModuleInfo(key: "norm") var normalization: LayerNorm
+    @ModuleInfo(key: "pwconv1") var pointwiseProjection: Linear
+
+    private let activation = GELU(approximation: .none)
+
+    init(dimensions: Int) {
+        _depthwiseConvolution.wrappedValue = Conv2d(
+            inputChannels: dimensions,
+            outputChannels: dimensions,
+            kernelSize: 3,
+            padding: 1,
+            groups: dimensions
+        )
+        _normalization.wrappedValue = LayerNorm(dimensions: dimensions, eps: 1e-6)
+        _pointwiseProjection.wrappedValue = Linear(dimensions, dimensions)
+    }
+
+    func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
+        hiddenStates + activation(pointwiseProjection(normalization(depthwiseConvolution(hiddenStates))))
+    }
+}
+
+final class RfDetrSegmentationMLPBlock: Module, UnaryLayer {
+
+    @ModuleInfo(key: "norm_in") var inputNormalization: LayerNorm
+    @ModuleInfo(key: "fc1") var linear1: Linear
+    @ModuleInfo(key: "fc2") var linear2: Linear
+
+    private let activation = GELU(approximation: .none)
+
+    init(dimensions: Int) {
+        _inputNormalization.wrappedValue = LayerNorm(dimensions: dimensions)
+        _linear1.wrappedValue = Linear(dimensions, dimensions * 4)
+        _linear2.wrappedValue = Linear(dimensions * 4, dimensions)
+    }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0.replacing("layers.0.", with: "fc1.")
+                .replacing("layers.2.", with: "fc2.")
+        }
+    }
+
+    func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
+        hiddenStates + linear2(activation(linear1(inputNormalization(hiddenStates))))
+    }
+}
+
+final class RfDetrSegmentationHead: Module {
+
+    @ModuleInfo(key: "blocks") var blocks: [RfDetrDepthwiseConvBlock]
+    @ModuleInfo(key: "spatial_features_proj") var spatialFeaturesProjection: Conv2d
+    @ModuleInfo(key: "query_features_block") var queryFeaturesBlock: RfDetrSegmentationMLPBlock
+    @ModuleInfo(key: "query_features_proj") var queryFeaturesProjection: Linear
+    @ParameterInfo(key: "bias") var bias: MLXArray
+
+    private let downsampleRatio: Int
+
+    init(_ config: RfDetrConfig) {
+        let bottleneckRatio = max(1, config.segmentationBottleneckRatio)
+        let interactionDimensions = max(1, config.dModel / bottleneckRatio)
+
+        _blocks.wrappedValue = (0..<config.decoderLayers).map { _ in
+            RfDetrDepthwiseConvBlock(dimensions: config.dModel)
+        }
+        _spatialFeaturesProjection.wrappedValue = Conv2d(
+            inputChannels: config.dModel,
+            outputChannels: interactionDimensions,
+            kernelSize: 1
+        )
+        _queryFeaturesBlock.wrappedValue = RfDetrSegmentationMLPBlock(dimensions: config.dModel)
+        _queryFeaturesProjection.wrappedValue = Linear(config.dModel, interactionDimensions)
+        _bias.wrappedValue = MLX.zeros([1])
+
+        downsampleRatio = max(1, config.maskDownsampleRatio)
+    }
+
+    func callAsFunction(
+        spatialFeatures: MLXArray,
+        queryFeatures: [MLXArray],
+        imageSize: (Int, Int)
+    ) -> [MLXArray] {
+        precondition(
+            queryFeatures.count == blocks.count,
+            "RF-DETR segmentation head expects one query-feature tensor per decoder block."
+        )
+
+        let targetHeight = max(1, imageSize.0 / downsampleRatio)
+        let targetWidth = max(1, imageSize.1 / downsampleRatio)
+
+        var spatial = spatialFeatures.interpolate(
+            size: [targetHeight, targetWidth],
+            mode: .linear(alignCorners: false)
+        )
+
+        var maskLogits: [MLXArray] = []
+        for (block, queryFeature) in zip(blocks, queryFeatures) {
+            spatial = block(spatial)
+            let projectedSpatialFeatures = spatialFeaturesProjection(spatial)
+            let projectedQueryFeatures = queryFeaturesProjection(queryFeaturesBlock(queryFeature))
+            let mask = MLX.einsum("bhwc,bqc->bqhw", projectedSpatialFeatures, projectedQueryFeatures) + bias
+            maskLogits.append(mask)
+        }
+
+        return maskLogits
+    }
+}
+
 final class RfDetrDecoder: Module {
+
+    typealias Output = (
+        hiddenStates: MLXArray,
+        intermediateHiddenStates: MLXArray
+    )
 
     @ModuleInfo(key: "layers") var layers: [RfDetrDecoderLayer]
     @ModuleInfo(key: "layernorm") var layerNorm: LayerNorm
@@ -807,7 +990,7 @@ final class RfDetrDecoder: Module {
         validRatios: MLXArray,
         spatialShape: (Int, Int),
         encoderHiddenStates: MLXArray
-    ) -> MLXArray {
+    ) -> Output {
         func genSinePositionEmbeddings(_ positions: MLXArray, hiddenSize: Int) -> MLXArray {
             let scale: Float = 2 * .pi
             let dimension = hiddenSize / 2
@@ -843,6 +1026,7 @@ final class RfDetrDecoder: Module {
         let querySineEmbed = genSinePositionEmbeddings(referenceInputs[0..., 0..., 0, 0...], hiddenSize: dModel)
         let queryPos = refPointHead(querySineEmbed)
 
+        var intermediateHiddenStates: [MLXArray] = []
         for layer in layers {
             hiddenStates = layer(
                 hiddenStates: hiddenStates,
@@ -851,9 +1035,13 @@ final class RfDetrDecoder: Module {
                 spatialShape: spatialShape,
                 encoderHiddenStates: encoderHiddenStates
             )
+            intermediateHiddenStates.append(layerNorm(hiddenStates))
         }
 
-        return layerNorm(hiddenStates)
+        return (
+            hiddenStates: intermediateHiddenStates.last!,
+            intermediateHiddenStates: MLX.stacked(intermediateHiddenStates, axis: 0)
+        )
     }
 }
 

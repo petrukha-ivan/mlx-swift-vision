@@ -100,7 +100,15 @@ extension ModelRegistry {
                 let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
                 let processor = DetrForInstanceSegmentationProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
                 return ModelPipeline(model: model, processor: processor).asAny()
-            }
+            },
+            "rf_detr": { url, overrides in
+                let modelConfig = try RfDetrForObjectDetectionConfig.decoded(from: url.modelConfig)
+                let model = RfDetrModelForInstanceSegmentation(modelConfig)
+                let imageProcessorConfig = try ImagePreprocessorConfig.decoded(from: url.preprocessorConfig)
+                let imagePreprocessor = ImagePreprocessor(imageProcessorConfig, overrides: overrides)
+                let processor = RfDetrForInstanceSegmentationProcessor(modelConfig: modelConfig, imagePreprocessor: imagePreprocessor)
+                return ModelPipeline(model: model, processor: processor).asAny()
+            },
         ])
     }
 

@@ -46,3 +46,61 @@ final class RfDetrForObjectDetectionProcessor: Processor {
         }
     }
 }
+
+final class RfDetrForInstanceSegmentationProcessor: Processor {
+
+    private let labels: [String]
+    private let numQueries: Int
+    private let imagePreprocessor: ImagePreprocessor
+
+    init(modelConfig: RfDetrForObjectDetectionConfig, imagePreprocessor: ImagePreprocessor) {
+        self.labels = modelConfig.id2label.flattened
+        self.numQueries = modelConfig.numQueries
+        self.imagePreprocessor = imagePreprocessor
+    }
+
+    func preprocess(_ request: InstanceSegmentationRequest) throws -> ImageInput {
+        try imagePreprocessor.preprocess(image: request.image)
+    }
+
+    func postprocess(_ output: RfDetrModelForInstanceSegmentation.Output, _ request: InstanceSegmentationRequest) throws -> [InstanceSegmentationResult] {
+        let probs = output.probs.squeezed()[.ellipsis, 0..<labels.count]
+        var scores = probs.max(axis: -1).asArray(Float.self)
+        let keep = scores.indices(where: { $0 > request.scoreThreshold })
+        guard !keep.isEmpty else {
+            return []
+        }
+
+        let (cx, cy, w, h) = output.boxes.squeezed().split(axis: -1)
+        let boxes = MLX.stacked([cx - 0.5 * w, cy - 0.5 * h, w, h], axis: -1).split(parts: numQueries)[keep]
+        let masks = output.segmentationMask.split(parts: numQueries)[keep].map { $0.squeezed() }
+        let labels = probs.argmax(axis: -1).asArray(Int.self)[keep].map({ self.labels[$0] })
+        scores = scores[keep]
+
+        return zip(masks, boxes, labels, scores).map { mask, bbox, label, score in
+            let (height, width) = mask.shape2
+            let pixelValues = MLX.where(
+                mask .> 0,
+                MLXArray(255, dtype: .uint8),
+                MLXArray(0, dtype: .uint8)
+            )
+
+            let imageData = pixelValues.asData()
+            let imageSize = CGSize(width: CGFloat(width), height: CGFloat(height))
+            let mask = CIImage(
+                bitmapData: imageData.data,
+                bytesPerRow: width,
+                size: imageSize,
+                format: .L8,
+                colorSpace: CGColorSpace(name: CGColorSpace.linearGray)
+            )
+
+            return InstanceSegmentationResult(
+                mask: mask,
+                bbox: bbox.asArray(Float.self),
+                label: label,
+                score: score
+            )
+        }
+    }
+}
