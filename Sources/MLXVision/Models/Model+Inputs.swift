@@ -1,5 +1,5 @@
 //
-//  ModelInputs.swift
+//  Model+Inputs.swift
 //  MLXVision
 //
 //  Created by Ivan Petrukha on 07.12.2025.
