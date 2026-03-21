@@ -18,13 +18,13 @@ final class LwDetrModelForObjectDetection: Module, Predictor {
     )
 
     @ModuleInfo var model: LwDetrModel
-    @ModuleInfo(key: "class_embed") var classEmbed: Linear
-    @ModuleInfo(key: "bbox_embed") var bboxEmbed: LwDetrMLPPredictionHead
+    @ModuleInfo(key: "class_embed") var classifier: Linear
+    @ModuleInfo(key: "bbox_embed") var bboxPredictionHead: LwDetrMLPPredictionHead
 
     init(_ config: LwDetrForObjectDetectionConfig) {
         _model.wrappedValue = LwDetrModel(config, numClasses: config.id2label.count)
-        _classEmbed.wrappedValue = Linear(config.dModel, config.id2label.count)
-        _bboxEmbed.wrappedValue = LwDetrMLPPredictionHead(
+        _classifier.wrappedValue = Linear(config.dModel, config.id2label.count)
+        _bboxPredictionHead.wrappedValue = LwDetrMLPPredictionHead(
             inputDimensions: config.dModel,
             hiddenDimensions: config.dModel,
             outputDimensions: 4,
@@ -33,11 +33,11 @@ final class LwDetrModelForObjectDetection: Module, Predictor {
     }
 
     private lazy var _predict = MLX.compile { [unowned self] inputs in
-        let (hiddenStates, referencePoints) = model(inputs[0])
-        let logits = classEmbed(hiddenStates)
+        let outputs = model(inputs[0])
+        let logits = classifier(outputs.hiddenStates)
         let probs = logits.softmax(axis: -1)
-        let boxesDelta = bboxEmbed(hiddenStates)
-        var boxes = refineBoxes(referencePoints, boxesDelta)
+        let boxesDelta = bboxPredictionHead(outputs.hiddenStates)
+        let boxes = refineBoxes(outputs.referencePoints, boxesDelta)
         return [logits, probs, boxes]
     }
 
@@ -47,11 +47,13 @@ final class LwDetrModelForObjectDetection: Module, Predictor {
     }
 }
 
-final class LwDetrModel: Module {
+class LwDetrModel: Module {
 
     typealias Output = (
         hiddenStates: MLXArray,
-        referencePoints: MLXArray
+        referencePoints: MLXArray,
+        intermediateHiddenStates: MLXArray,
+        spatialFeatures: MLXArray
     )
 
     private let numQueries: Int
@@ -66,41 +68,60 @@ final class LwDetrModel: Module {
     @ModuleInfo(key: "reference_point_embed") var referencePointEmbed: Embedding
     @ParameterInfo(key: "_query_indices") var queryIndices: MLXArray
 
-    init(_ config: LwDetrConfig, numClasses: Int) {
-        numQueries = config.numQueries
-        _backbone.wrappedValue = LwDetrConvEncoder(config)
-        _decoder.wrappedValue = LwDetrDecoder(config)
-        _encOutput.wrappedValue = (0..<config.groupDetr).map { _ in
-            Linear(config.dModel, config.dModel)
+    init(
+        numQueries: Int,
+        groupDetr: Int,
+        dModel: Int,
+        numClasses: Int,
+        backbone: LwDetrConvEncoder,
+        decoder: LwDetrDecoder,
+        bboxHeads: [LwDetrMLPPredictionHead]
+    ) {
+        self.numQueries = numQueries
+        _backbone.wrappedValue = backbone
+        _decoder.wrappedValue = decoder
+        _encOutput.wrappedValue = (0..<groupDetr).map { _ in
+            Linear(dModel, dModel)
         }
-        _encOutputNorm.wrappedValue = (0..<config.groupDetr).map { _ in
-            LayerNorm(dimensions: config.dModel)
+        _encOutputNorm.wrappedValue = (0..<groupDetr).map { _ in
+            LayerNorm(dimensions: dModel)
         }
-        _encOutClassEmbed.wrappedValue = (0..<config.groupDetr).map { _ in
-            Linear(config.dModel, numClasses)
+        _encOutClassEmbed.wrappedValue = (0..<groupDetr).map { _ in
+            Linear(dModel, numClasses)
         }
-        _encOutBBoxEmbed.wrappedValue = (0..<config.groupDetr).map { _ in
-            LwDetrMLPPredictionHead(
-                inputDimensions: config.dModel,
-                hiddenDimensions: config.dModel,
-                outputDimensions: 4,
-                layersCount: 3
-            )
-        }
+        _encOutBBoxEmbed.wrappedValue = bboxHeads
         _queryFeat.wrappedValue = Embedding(
-            embeddingCount: config.numQueries * config.groupDetr,
-            dimensions: config.dModel
+            embeddingCount: numQueries * groupDetr,
+            dimensions: dModel
         )
         _referencePointEmbed.wrappedValue = Embedding(
-            embeddingCount: config.numQueries * config.groupDetr,
+            embeddingCount: numQueries * groupDetr,
             dimensions: 4
         )
-        _queryIndices.wrappedValue = Array(0..<config.numQueries).asMLXArray(dtype: .int32)
+        _queryIndices.wrappedValue = Array(0..<numQueries).asMLXArray(dtype: .int32)
+    }
+
+    convenience init(_ config: LwDetrConfig, numClasses: Int) {
+        self.init(
+            numQueries: config.numQueries,
+            groupDetr: config.groupDetr,
+            dModel: config.dModel,
+            numClasses: numClasses,
+            backbone: LwDetrConvEncoder(config),
+            decoder: LwDetrDecoder(config),
+            bboxHeads: (0..<config.groupDetr).map { _ in
+                LwDetrMLPPredictionHead(
+                    inputDimensions: config.dModel,
+                    hiddenDimensions: config.dModel,
+                    outputDimensions: 4,
+                    layersCount: 3
+                )
+            }
+        )
     }
 
     func callAsFunction(_ pixelValues: MLXArray) -> Output {
         let (projectedFeatures, featureMask) = backbone(pixelValues)
-
         let (batchSize, height, width, _) = projectedFeatures.shape4
         let sourceFlatten = projectedFeatures.flattened(start: 1, end: 2)
         let maskFlatten = featureMask.flattened(start: 1, end: 2)
@@ -127,7 +148,7 @@ final class LwDetrModel: Module {
         target = MLX.repeated(target, count: batchSize, axis: 0)
 
         let validRatios = MLXArray.ones([batchSize, 1, 2], dtype: sourceFlatten.dtype)
-        let hiddenStates = decoder(
+        let decoderOutputs = decoder(
             inputsEmbeds: target,
             referencePoints: referencePoints,
             validRatios: validRatios,
@@ -135,7 +156,12 @@ final class LwDetrModel: Module {
             encoderHiddenStates: sourceFlatten
         )
 
-        return (hiddenStates, referencePoints)
+        return (
+            hiddenStates: decoderOutputs.hiddenStates,
+            referencePoints: referencePoints,
+            intermediateHiddenStates: decoderOutputs.intermediateHiddenStates,
+            spatialFeatures: projectedFeatures
+        )
     }
 
     private func generateTopKCoords(
@@ -200,14 +226,28 @@ final class LwDetrModel: Module {
     }
 }
 
-final class LwDetrConvEncoder: Module {
+class LwDetrConvEncoder: Module {
 
-    @ModuleInfo(key: "backbone") var backbone: LwDetrVitBackbone
+    protocol Backbone: Module {
+        func callAsFunction(_ pixelValues: MLXArray) -> [MLXArray]
+    }
+
+    @ModuleInfo(key: "backbone") var backbone: any Backbone
     @ModuleInfo(key: "projector") var projector: LwDetrScaleProjector
 
-    init(_ config: LwDetrConfig) {
-        _backbone.wrappedValue = LwDetrVitBackbone(config.backboneConfig)
-        _projector.wrappedValue = LwDetrScaleProjector(config)
+    init(
+        backbone: any Backbone,
+        projector: LwDetrScaleProjector
+    ) {
+        _backbone.wrappedValue = backbone
+        _projector.wrappedValue = projector
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            backbone: LwDetrVitBackbone(config.backboneConfig),
+            projector: LwDetrScaleProjector(config)
+        )
     }
 
     func callAsFunction(_ pixelValues: MLXArray) -> (MLXArray, MLXArray) {
@@ -219,11 +259,10 @@ final class LwDetrConvEncoder: Module {
     }
 }
 
-// TODO: Extract shared RT/LW/RF windowed ViT backbone components.
-final class LwDetrVitBackbone: Module {
+final class LwDetrVitBackbone: Module, LwDetrConvEncoder.Backbone {
 
-    @ModuleInfo(key: "embeddings") var embeddings: LwDetrVitEmbeddings
-    @ModuleInfo(key: "encoder") var encoder: LwDetrVitEncoder
+    @ModuleInfo var embeddings: LwDetrVitEmbeddings
+    @ModuleInfo var encoder: LwDetrVitEncoder
 
     private let outIndices: Set<Int>
     private let numWindowsSide: Int
@@ -293,19 +332,19 @@ final class LwDetrVitBackbone: Module {
 final class LwDetrVitEmbeddings: Module {
 
     @ParameterInfo(key: "position_embeddings") var positionEmbeddings: MLXArray
-    @ModuleInfo(key: "projection") var projection: Conv2d
+    @ModuleInfo var projection: Conv2d
 
     private let useAbsolutePositionEmbeddings: Bool
 
     init(_ config: LwDetrVitConfig) {
+        let patchesPerSide = max(1, config.pretrainImageSize / config.patchSize)
+        let numPositions = patchesPerSide * patchesPerSide + 1
         _projection.wrappedValue = Conv2d(
             inputChannels: config.numChannels,
             outputChannels: config.hiddenSize,
             kernelSize: IntOrPair(config.patchSize),
             stride: IntOrPair(config.patchSize)
         )
-        let patchesPerSide = max(1, config.pretrainImageSize / config.patchSize)
-        let numPositions = patchesPerSide * patchesPerSide + 1
         _positionEmbeddings.wrappedValue = MLX.zeros([1, numPositions, config.hiddenSize])
         useAbsolutePositionEmbeddings = config.useAbsolutePositionEmbeddings
     }
@@ -336,10 +375,6 @@ final class LwDetrVitEmbeddings: Module {
 
         let numPositions = withoutCls.shape[1]
         let size = Int(Double(numPositions).squareRoot())
-        precondition(
-            size * size == numPositions,
-            "Absolute position embeddings must be a square number."
-        )
 
         if size == height, size == width {
             return withoutCls.reshaped(1, height, width, -1)
@@ -379,30 +414,30 @@ final class LwDetrVitLayer: Module {
 
     @ModuleInfo(key: "attention") var attention: LwDetrVitAttention
     @ModuleInfo(key: "intermediate") var intermediate: LwDetrVitMLP
-    @ModuleInfo(key: "layernorm_before") var layerNormBefore: LayerNorm
-    @ModuleInfo(key: "layernorm_after") var layerNormAfter: LayerNorm
-    @ParameterInfo(key: "gamma_1") var gamma1: MLXArray
-    @ParameterInfo(key: "gamma_2") var gamma2: MLXArray
+    @ModuleInfo(key: "layernorm_before") var preAttentionNormalization: LayerNorm
+    @ModuleInfo(key: "layernorm_after") var preMLPNormalization: LayerNorm
+    @ParameterInfo(key: "gamma_1") var attentionScale: MLXArray
+    @ParameterInfo(key: "gamma_2") var mlpScale: MLXArray
 
     private let numWindows: Int
-    private let windowAttention: Bool
+    private let usesWindowAttention: Bool
 
     init(_ config: LwDetrVitConfig, layerIndex: Int) {
         _attention.wrappedValue = LwDetrVitAttention(config)
         _intermediate.wrappedValue = LwDetrVitMLP(config)
-        _layerNormBefore.wrappedValue = LayerNorm(dimensions: config.hiddenSize, eps: config.layerNormEps)
-        _layerNormAfter.wrappedValue = LayerNorm(dimensions: config.hiddenSize, eps: config.layerNormEps)
-        _gamma1.wrappedValue = MLX.ones([config.hiddenSize])
-        _gamma2.wrappedValue = MLX.ones([config.hiddenSize])
+        _preAttentionNormalization.wrappedValue = LayerNorm(dimensions: config.hiddenSize, eps: config.layerNormEps)
+        _preMLPNormalization.wrappedValue = LayerNorm(dimensions: config.hiddenSize, eps: config.layerNormEps)
+        _attentionScale.wrappedValue = MLX.ones([config.hiddenSize])
+        _mlpScale.wrappedValue = MLX.ones([config.hiddenSize])
         numWindows = max(1, config.numWindows)
-        windowAttention = Set(config.windowBlockIndices).contains(layerIndex)
+        usesWindowAttention = Set(config.windowBlockIndices).contains(layerIndex)
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
         let (batchSize, sequenceLength, channels) = hiddenStates.shape3
-        var normalizedStates = layerNormBefore(hiddenStates)
+        var normalizedStates = preAttentionNormalization(hiddenStates)
 
-        if !windowAttention {
+        if !usesWindowAttention {
             normalizedStates = normalizedStates.reshaped(
                 batchSize / numWindows,
                 numWindows * sequenceLength,
@@ -410,16 +445,16 @@ final class LwDetrVitLayer: Module {
             )
         }
 
-        var attentionOutput = attention(normalizedStates) * gamma1
-        if !windowAttention {
+        var attentionOutput = attention(normalizedStates) * attentionScale
+        if !usesWindowAttention {
             attentionOutput = attentionOutput.reshaped(batchSize, sequenceLength, channels)
         }
 
         var output = hiddenStates + attentionOutput
 
-        var layerOutput = layerNormAfter(output)
+        var layerOutput = preMLPNormalization(output)
         layerOutput = intermediate(layerOutput)
-        layerOutput = layerOutput * gamma2
+        layerOutput = layerOutput * mlpScale
 
         output = output + layerOutput
         return output
@@ -428,7 +463,7 @@ final class LwDetrVitLayer: Module {
 
 final class LwDetrVitAttention: Module, UnaryLayer {
 
-    @ModuleInfo(key: "attention") var attention: LwDetrVitSelfAttention
+    @ModuleInfo var attention: LwDetrVitSelfAttention
     @ModuleInfo(key: "output") var output: Linear
 
     init(_ config: LwDetrVitConfig) {
@@ -443,11 +478,11 @@ final class LwDetrVitAttention: Module, UnaryLayer {
 
 final class LwDetrVitSelfAttention: Module, UnaryLayer {
 
-    private let numHeads: Int
+    let numHeads: Int
 
-    @ModuleInfo(key: "query") var query: Linear
-    @ModuleInfo(key: "key") var key: Linear
-    @ModuleInfo(key: "value") var value: Linear
+    @ModuleInfo var query: Linear
+    @ModuleInfo var key: Linear
+    @ModuleInfo var value: Linear
 
     init(_ config: LwDetrVitConfig) {
         numHeads = config.numAttentionHeads
@@ -457,20 +492,19 @@ final class LwDetrVitSelfAttention: Module, UnaryLayer {
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
-        let (batchSize, seqLength, _) = hiddenStates.shape3
+        var queries = query(hiddenStates)
+        var keys = key(hiddenStates)
+        var values = value(hiddenStates)
 
-        let queries = query(hiddenStates)
-            .reshaped(batchSize, seqLength, numHeads, -1)
-            .transposed(0, 2, 1, 3)
-        let keys = key(hiddenStates)
-            .reshaped(batchSize, seqLength, numHeads, -1)
-            .transposed(0, 2, 1, 3)
-        let values = value(hiddenStates)
-            .reshaped(batchSize, seqLength, numHeads, -1)
-            .transposed(0, 2, 1, 3)
+        let (B, L, _) = queries.shape3
+        let (_, S, _) = keys.shape3
+
+        queries = queries.reshaped(B, L, numHeads, -1).transposed(0, 2, 1, 3)
+        keys = keys.reshaped(B, S, numHeads, -1).transposed(0, 2, 1, 3)
+        values = values.reshaped(B, S, numHeads, -1).transposed(0, 2, 1, 3)
 
         let scale = sqrt(1 / Float(queries.dim(-1)))
-        return MLXFast.scaledDotProductAttention(
+        let output = MLXFast.scaledDotProductAttention(
             queries: queries,
             keys: keys,
             values: values,
@@ -478,51 +512,69 @@ final class LwDetrVitSelfAttention: Module, UnaryLayer {
             mask: .none
         )
         .transposed(0, 2, 1, 3)
-        .reshaped(batchSize, seqLength, -1)
+        .reshaped(B, L, -1)
+
+        return output
     }
 }
 
 final class LwDetrVitMLP: Module, UnaryLayer {
 
-    @ModuleInfo(key: "fc1") var fc1: Linear
-    @ModuleInfo(key: "fc2") var fc2: Linear
+    @ModuleInfo(key: "fc1") var expansionProjection: Linear
+    @ModuleInfo(key: "fc2") var outputProjection: Linear
 
     private let activation: UnaryLayer
 
     init(_ config: LwDetrVitConfig) {
-        _fc1.wrappedValue = Linear(config.hiddenSize, config.hiddenSize * config.mlpRatio)
-        _fc2.wrappedValue = Linear(config.hiddenSize * config.mlpRatio, config.hiddenSize)
+        _expansionProjection.wrappedValue = Linear(config.hiddenSize, config.hiddenSize * config.mlpRatio)
+        _outputProjection.wrappedValue = Linear(config.hiddenSize * config.mlpRatio, config.hiddenSize)
         activation = config.hiddenAct.layer
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        fc2(activation(fc1(x)))
+        outputProjection(activation(expansionProjection(x)))
     }
 }
 
-final class LwDetrScaleProjector: Module {
+class LwDetrScaleProjector: Module {
 
     @ModuleInfo(key: "scale_layers") var scaleLayers: [LwDetrScaleProjectorStage]
 
-    init(_ config: LwDetrConfig) {
-        _scaleLayers.wrappedValue = [LwDetrScaleProjectorStage(config)]
+    init(scaleLayers: [LwDetrScaleProjectorStage]) {
+        _scaleLayers.wrappedValue = scaleLayers
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(scaleLayers: [LwDetrScaleProjectorStage(config)])
     }
 
     func callAsFunction(_ hiddenStates: [MLXArray]) -> MLXArray {
         let concatenated = MLX.concatenated(hiddenStates, axis: -1)
-        return scaleLayers[0](concatenated)
+        return scaleLayers[0].callAsFunction(concatenated)
     }
 }
 
-final class LwDetrScaleProjectorStage: Module {
+class LwDetrScaleProjectorStage: Module {
 
     @ModuleInfo(key: "projector_layer") var projectorLayer: LwDetrC2FLayer
     @ModuleInfo(key: "layer_norm") var layerNorm: LayerNorm
 
-    init(_ config: LwDetrConfig) {
+    init(
+        projectorLayer: LwDetrC2FLayer,
+        outputChannels: Int,
+        layerNormEps: Float
+    ) {
+        _projectorLayer.wrappedValue = projectorLayer
+        _layerNorm.wrappedValue = LayerNorm(dimensions: outputChannels, eps: layerNormEps)
+    }
+
+    convenience init(_ config: LwDetrConfig) {
         let projectorInputDim = config.backboneConfig.hiddenSize * max(1, config.backboneConfig.outIndices.count)
-        _projectorLayer.wrappedValue = LwDetrC2FLayer(config, inputChannels: projectorInputDim)
-        _layerNorm.wrappedValue = LayerNorm(dimensions: config.dModel, eps: config.layerNormEps)
+        self.init(
+            projectorLayer: LwDetrC2FLayer(config, inputChannels: projectorInputDim),
+            outputChannels: config.dModel,
+            layerNormEps: config.layerNormEps
+        )
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
@@ -530,42 +582,53 @@ final class LwDetrScaleProjectorStage: Module {
     }
 }
 
-final class LwDetrC2FLayer: Module, UnaryLayer {
+class LwDetrC2FLayer: Module, UnaryLayer {
 
-    private let hiddenChannels: Int
-
-    @ModuleInfo(key: "conv1") var conv1: LwDetrConvNormLayer
-    @ModuleInfo(key: "conv2") var conv2: LwDetrConvNormLayer
+    @ModuleInfo(key: "conv1") var inputProjection: LwDetrConvNormLayer
+    @ModuleInfo(key: "conv2") var outputProjection: LwDetrConvNormLayer
     @ModuleInfo var bottlenecks: [LwDetrRepVggBlock]
 
-    init(_ config: LwDetrConfig, inputChannels: Int) {
-        hiddenChannels = Int(Float(config.dModel) * config.hiddenExpansion)
+    init(
+        inputProjection: LwDetrConvNormLayer,
+        outputProjection: LwDetrConvNormLayer,
+        bottlenecks: [LwDetrRepVggBlock]
+    ) {
+        _inputProjection.wrappedValue = inputProjection
+        _outputProjection.wrappedValue = outputProjection
+        _bottlenecks.wrappedValue = bottlenecks
+    }
 
-        _conv1.wrappedValue = LwDetrConvNormLayer(
-            inputChannels: inputChannels,
-            outputChannels: hiddenChannels * 2,
-            kernelSize: 1,
-            stride: 1,
-            eps: config.batchNormEps,
-            activation: config.activationFunction.layer
+    convenience init(_ config: LwDetrConfig, inputChannels: Int) {
+        let hiddenChannels = Int(Float(config.dModel) * config.hiddenExpansion)
+        self.init(
+            inputProjection: LwDetrConvNormLayer(
+                inputChannels: inputChannels,
+                outputChannels: hiddenChannels * 2,
+                kernelSize: 1,
+                stride: 1,
+                normalization: BatchNorm(featureCount: hiddenChannels * 2, eps: config.batchNormEps),
+                activation: config.activationFunction.layer
+            ),
+            outputProjection: LwDetrConvNormLayer(
+                inputChannels: (2 + config.c2fNumBlocks) * hiddenChannels,
+                outputChannels: config.dModel,
+                kernelSize: 1,
+                stride: 1,
+                normalization: BatchNorm(featureCount: config.dModel, eps: config.batchNormEps),
+                activation: config.activationFunction.layer
+            ),
+            bottlenecks: (0..<config.c2fNumBlocks).map { _ in
+                LwDetrRepVggBlock(
+                    channels: hiddenChannels,
+                    normalization: { BatchNorm(featureCount: hiddenChannels, eps: config.batchNormEps) },
+                    activation: { config.activationFunction.layer }
+                )
+            }
         )
-
-        _conv2.wrappedValue = LwDetrConvNormLayer(
-            inputChannels: (2 + config.c2fNumBlocks) * hiddenChannels,
-            outputChannels: config.dModel,
-            kernelSize: 1,
-            stride: 1,
-            eps: config.batchNormEps,
-            activation: config.activationFunction.layer
-        )
-
-        _bottlenecks.wrappedValue = (0..<config.c2fNumBlocks).map { _ in
-            LwDetrRepVggBlock(config)
-        }
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        let hidden = conv1(x)
+        let hidden = inputProjection(x)
         let split = hidden.split(parts: 2, axis: -1)
 
         var allStates: [MLXArray] = [split[0], split[1]]
@@ -576,58 +639,68 @@ final class LwDetrC2FLayer: Module, UnaryLayer {
             allStates.append(current)
         }
 
-        return conv2(MLX.concatenated(allStates, axis: -1))
+        return outputProjection(MLX.concatenated(allStates, axis: -1))
     }
 }
 
-final class LwDetrRepVggBlock: Module, UnaryLayer {
+class LwDetrRepVggBlock: Module, UnaryLayer {
 
-    @ModuleInfo(key: "conv1") var conv1: LwDetrConvNormLayer
-    @ModuleInfo(key: "conv2") var conv2: LwDetrConvNormLayer
+    @ModuleInfo(key: "conv1") var inputConvolution: LwDetrConvNormLayer
+    @ModuleInfo(key: "conv2") var outputConvolution: LwDetrConvNormLayer
 
-    init(_ config: LwDetrConfig) {
-        let channels = Int(Float(config.dModel) * config.hiddenExpansion)
-
-        _conv1.wrappedValue = LwDetrConvNormLayer(
+    init(
+        channels: Int,
+        normalization: () -> UnaryLayer,
+        activation: () -> UnaryLayer
+    ) {
+        _inputConvolution.wrappedValue = LwDetrConvNormLayer(
             inputChannels: channels,
             outputChannels: channels,
             kernelSize: 3,
             stride: 1,
-            eps: config.batchNormEps,
-            activation: config.activationFunction.layer
+            normalization: normalization(),
+            activation: activation()
         )
-
-        _conv2.wrappedValue = LwDetrConvNormLayer(
+        _outputConvolution.wrappedValue = LwDetrConvNormLayer(
             inputChannels: channels,
             outputChannels: channels,
             kernelSize: 3,
             stride: 1,
-            eps: config.batchNormEps,
-            activation: config.activationFunction.layer
+            normalization: normalization(),
+            activation: activation()
         )
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        conv2(conv1(x))
+        outputConvolution(inputConvolution(x))
     }
 }
 
-final class LwDetrConvNormLayer: Module, UnaryLayer {
+class LwDetrConvNormLayer: Module, UnaryLayer {
 
     @ModuleInfo(key: "conv") var convolution: Conv2d
-    @ModuleInfo(key: "norm") var normalization: BatchNorm
-
-    private let activation: UnaryLayer
+    @ModuleInfo(key: "norm") var normalization: UnaryLayer
+    @ModuleInfo var activation: UnaryLayer
 
     init(
+        convolution: Conv2d,
+        normalization: UnaryLayer,
+        activation: UnaryLayer
+    ) {
+        _convolution.wrappedValue = convolution
+        _normalization.wrappedValue = normalization
+        _activation.wrappedValue = activation
+    }
+
+    convenience init(
         inputChannels: Int,
         outputChannels: Int,
         kernelSize: Int,
         stride: Int,
-        eps: Float,
+        normalization: UnaryLayer,
         activation: UnaryLayer
     ) {
-        _convolution.wrappedValue = Conv2d(
+        let convolution = Conv2d(
             inputChannels: inputChannels,
             outputChannels: outputChannels,
             kernelSize: IntOrPair(kernelSize),
@@ -635,8 +708,11 @@ final class LwDetrConvNormLayer: Module, UnaryLayer {
             padding: IntOrPair(kernelSize / 2),
             bias: false
         )
-        _normalization.wrappedValue = BatchNorm(featureCount: outputChannels, eps: eps)
-        self.activation = activation
+        self.init(
+            convolution: convolution,
+            normalization: normalization,
+            activation: activation
+        )
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
@@ -644,8 +720,12 @@ final class LwDetrConvNormLayer: Module, UnaryLayer {
     }
 }
 
-// TODO: Extract shared RT/LW/RF deformable decoder stack.
-final class LwDetrDecoder: Module {
+class LwDetrDecoder: Module {
+
+    typealias Output = (
+        hiddenStates: MLXArray,
+        intermediateHiddenStates: MLXArray
+    )
 
     @ModuleInfo(key: "layers") var layers: [LwDetrDecoderLayer]
     @ModuleInfo(key: "layernorm") var layerNorm: LayerNorm
@@ -653,19 +733,31 @@ final class LwDetrDecoder: Module {
 
     private let dModel: Int
 
-    init(_ config: LwDetrConfig) {
-        _layers.wrappedValue = (0..<config.decoderLayers).map { _ in
-            LwDetrDecoderLayer(config)
-        }
-        _layerNorm.wrappedValue = LayerNorm(dimensions: config.dModel)
-        _refPointHead.wrappedValue = LwDetrMLPPredictionHead(
-            inputDimensions: 2 * config.dModel,
-            hiddenDimensions: config.dModel,
-            outputDimensions: config.dModel,
-            layersCount: 2
-        )
+    init(
+        dModel: Int,
+        layers: [LwDetrDecoderLayer],
+        refPointHead: LwDetrMLPPredictionHead
+    ) {
+        _layers.wrappedValue = layers
+        _layerNorm.wrappedValue = LayerNorm(dimensions: dModel)
+        _refPointHead.wrappedValue = refPointHead
 
-        dModel = config.dModel
+        self.dModel = dModel
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            dModel: config.dModel,
+            layers: (0..<config.decoderLayers).map { _ in
+                LwDetrDecoderLayer(config)
+            },
+            refPointHead: LwDetrMLPPredictionHead(
+                inputDimensions: 2 * config.dModel,
+                hiddenDimensions: config.dModel,
+                outputDimensions: config.dModel,
+                layersCount: 2
+            )
+        )
     }
 
     func callAsFunction(
@@ -674,7 +766,7 @@ final class LwDetrDecoder: Module {
         validRatios: MLXArray,
         spatialShape: (Int, Int),
         encoderHiddenStates: MLXArray
-    ) -> MLXArray {
+    ) -> Output {
         func genSinePositionEmbeddings(_ positions: MLXArray, hiddenSize: Int) -> MLXArray {
             let scale: Float = 2 * .pi
             let dimension = hiddenSize / 2
@@ -710,6 +802,7 @@ final class LwDetrDecoder: Module {
         let querySineEmbed = genSinePositionEmbeddings(referenceInputs[0..., 0..., 0, 0...], hiddenSize: dModel)
         let queryPos = refPointHead(querySineEmbed)
 
+        var intermediateHiddenStates: [MLXArray] = []
         for layer in layers {
             hiddenStates = layer(
                 hiddenStates: hiddenStates,
@@ -718,30 +811,48 @@ final class LwDetrDecoder: Module {
                 spatialShape: spatialShape,
                 encoderHiddenStates: encoderHiddenStates
             )
+            intermediateHiddenStates.append(layerNorm(hiddenStates))
         }
 
-        return layerNorm(hiddenStates)
+        return (
+            hiddenStates: intermediateHiddenStates.last!,
+            intermediateHiddenStates: MLX.stacked(intermediateHiddenStates, axis: 0)
+        )
     }
 }
 
-final class LwDetrDecoderLayer: Module {
+class LwDetrDecoderLayer: Module {
 
     @ModuleInfo(key: "self_attn") var selfAttention: LwDetrDecoderSelfAttention
-    @ModuleInfo(key: "self_attn_layer_norm") var selfAttentionLayerNorm: LayerNorm
+    @ModuleInfo(key: "self_attn_layer_norm") var selfAttentionNormalization: LayerNorm
 
     @ModuleInfo(key: "cross_attn") var crossAttention: LwDetrMultiscaleDeformableAttention
-    @ModuleInfo(key: "cross_attn_layer_norm") var crossAttentionLayerNorm: LayerNorm
+    @ModuleInfo(key: "cross_attn_layer_norm") var crossAttentionNormalization: LayerNorm
 
     @ModuleInfo(key: "mlp") var mlp: LwDetrDecoderMLP
-    @ModuleInfo(key: "layer_norm") var finalLayerNorm: LayerNorm
+    @ModuleInfo(key: "layer_norm") var outputNormalization: LayerNorm
 
-    init(_ config: LwDetrConfig) {
-        _selfAttention.wrappedValue = LwDetrDecoderSelfAttention(config)
-        _selfAttentionLayerNorm.wrappedValue = LayerNorm(dimensions: config.dModel)
-        _crossAttention.wrappedValue = LwDetrMultiscaleDeformableAttention(config)
-        _crossAttentionLayerNorm.wrappedValue = LayerNorm(dimensions: config.dModel)
-        _mlp.wrappedValue = LwDetrDecoderMLP(config)
-        _finalLayerNorm.wrappedValue = LayerNorm(dimensions: config.dModel)
+    init(
+        dModel: Int,
+        selfAttention: LwDetrDecoderSelfAttention,
+        crossAttention: LwDetrMultiscaleDeformableAttention,
+        mlp: LwDetrDecoderMLP
+    ) {
+        _selfAttention.wrappedValue = selfAttention
+        _selfAttentionNormalization.wrappedValue = LayerNorm(dimensions: dModel)
+        _crossAttention.wrappedValue = crossAttention
+        _crossAttentionNormalization.wrappedValue = LayerNorm(dimensions: dModel)
+        _mlp.wrappedValue = mlp
+        _outputNormalization.wrappedValue = LayerNorm(dimensions: dModel)
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            dModel: config.dModel,
+            selfAttention: LwDetrDecoderSelfAttention(config),
+            crossAttention: LwDetrMultiscaleDeformableAttention(config),
+            mlp: LwDetrDecoderMLP(config)
+        )
     }
 
     func callAsFunction(
@@ -757,7 +868,7 @@ final class LwDetrDecoderLayer: Module {
             hiddenStates,
             positionEmbeddings: positionEmbeddings
         )
-        hidden = selfAttentionLayerNorm(hidden + selfAttentionOutput)
+        hidden = selfAttentionNormalization(hidden + selfAttentionOutput)
 
         let crossAttentionOutput = crossAttention(
             hiddenStates: hidden,
@@ -766,33 +877,45 @@ final class LwDetrDecoderLayer: Module {
             encoderHiddenStates: encoderHiddenStates,
             spatialShape: spatialShape
         )
-        hidden = crossAttentionLayerNorm(hidden + crossAttentionOutput)
+        hidden = crossAttentionNormalization(hidden + crossAttentionOutput)
 
         let mlpOutput = mlp(hidden)
 
-        return finalLayerNorm(hidden + mlpOutput)
+        return outputNormalization(hidden + mlpOutput)
     }
 }
 
-final class LwDetrDecoderMLP: Module, UnaryLayer {
+class LwDetrDecoderMLP: Module, UnaryLayer {
 
-    @ModuleInfo(key: "fc1") var linear1: Linear
-    @ModuleInfo(key: "fc2") var linear2: Linear
+    @ModuleInfo(key: "fc1") var expansionProjection: Linear
+    @ModuleInfo(key: "fc2") var outputProjection: Linear
 
     private let activation: UnaryLayer
 
-    init(_ config: LwDetrConfig) {
-        _linear1.wrappedValue = Linear(config.dModel, config.decoderFfnDim)
-        _linear2.wrappedValue = Linear(config.decoderFfnDim, config.dModel)
-        activation = config.decoderActivationFunction.layer
+    init(
+        dModel: Int,
+        decoderFfnDim: Int,
+        activation: UnaryLayer
+    ) {
+        _expansionProjection.wrappedValue = Linear(dModel, decoderFfnDim)
+        _outputProjection.wrappedValue = Linear(decoderFfnDim, dModel)
+        self.activation = activation
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            dModel: config.dModel,
+            decoderFfnDim: config.decoderFfnDim,
+            activation: config.decoderActivationFunction.layer
+        )
     }
 
     func callAsFunction(_ hiddenStates: MLXArray) -> MLXArray {
-        linear2(activation(linear1(hiddenStates)))
+        outputProjection(activation(expansionProjection(hiddenStates)))
     }
 }
 
-final class LwDetrDecoderSelfAttention: Module {
+class LwDetrDecoderSelfAttention: Module {
 
     @ModuleInfo(key: "q_proj") var queryProjection: Linear
     @ModuleInfo(key: "k_proj") var keyProjection: Linear
@@ -801,12 +924,24 @@ final class LwDetrDecoderSelfAttention: Module {
 
     private let numHeads: Int
 
-    init(_ config: LwDetrConfig) {
-        numHeads = config.decoderSelfAttentionHeads
-        _queryProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
-        _keyProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
-        _valueProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
-        _outProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
+    init(
+        dModel: Int,
+        numHeads: Int,
+        attentionBias: Bool
+    ) {
+        self.numHeads = numHeads
+        _queryProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+        _keyProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+        _valueProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+        _outProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            dModel: config.dModel,
+            numHeads: config.decoderSelfAttentionHeads,
+            attentionBias: config.attentionBias
+        )
     }
 
     func callAsFunction(_ hiddenStates: MLXArray, positionEmbeddings: MLXArray? = nil) -> MLXArray {
@@ -835,7 +970,7 @@ final class LwDetrDecoderSelfAttention: Module {
     }
 }
 
-final class LwDetrMultiscaleDeformableAttention: Module {
+class LwDetrMultiscaleDeformableAttention: Module {
 
     @ModuleInfo(key: "sampling_offsets") var samplingOffsets: Linear
     @ModuleInfo(key: "attention_weights") var attentionWeights: Linear
@@ -847,15 +982,31 @@ final class LwDetrMultiscaleDeformableAttention: Module {
     private let nLevels: Int
     private let dModel: Int
 
-    init(_ config: LwDetrConfig) {
-        nHeads = config.decoderCrossAttentionHeads
-        nPoints = config.decoderNPoints
-        nLevels = config.numFeatureLevels
-        dModel = config.dModel
-        _samplingOffsets.wrappedValue = Linear(config.dModel, nHeads * nLevels * nPoints * 2, bias: config.attentionBias)
-        _attentionWeights.wrappedValue = Linear(config.dModel, nHeads * nLevels * nPoints, bias: config.attentionBias)
-        _valueProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
-        _outputProjection.wrappedValue = Linear(config.dModel, config.dModel, bias: config.attentionBias)
+    init(
+        dModel: Int,
+        nHeads: Int,
+        nPoints: Int,
+        nLevels: Int,
+        attentionBias: Bool
+    ) {
+        self.nHeads = nHeads
+        self.nPoints = nPoints
+        self.nLevels = nLevels
+        self.dModel = dModel
+        _samplingOffsets.wrappedValue = Linear(dModel, nHeads * nLevels * nPoints * 2, bias: attentionBias)
+        _attentionWeights.wrappedValue = Linear(dModel, nHeads * nLevels * nPoints, bias: attentionBias)
+        _valueProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+        _outputProjection.wrappedValue = Linear(dModel, dModel, bias: attentionBias)
+    }
+
+    convenience init(_ config: LwDetrConfig) {
+        self.init(
+            dModel: config.dModel,
+            nHeads: config.decoderCrossAttentionHeads,
+            nPoints: config.decoderNPoints,
+            nLevels: config.numFeatureLevels,
+            attentionBias: config.attentionBias
+        )
     }
 
     func callAsFunction(
@@ -978,7 +1129,7 @@ final class LwDetrMultiscaleDeformableAttention: Module {
     }
 }
 
-final class LwDetrMLPPredictionHead: Module, UnaryLayer {
+class LwDetrMLPPredictionHead: Module, UnaryLayer {
 
     @ModuleInfo(key: "layers") var layers: [Linear]
 
@@ -1007,7 +1158,7 @@ final class LwDetrMLPPredictionHead: Module, UnaryLayer {
     }
 }
 
-private func refineBoxes(_ referencePoints: MLXArray, _ deltas: MLXArray) -> MLXArray {
+func refineBoxes(_ referencePoints: MLXArray, _ deltas: MLXArray) -> MLXArray {
     let cxcy = deltas[0..., 0..., 0..<2] * referencePoints[0..., 0..., 2...] + referencePoints[0..., 0..., 0..<2]
     let widthHeight = deltas[0..., 0..., 2...].exp() * referencePoints[0..., 0..., 2...]
     return MLX.concatenated([cxcy, widthHeight], axis: -1)

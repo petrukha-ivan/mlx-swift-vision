@@ -1076,8 +1076,6 @@ final class RtDetrV2Decoder: Module {
 
     @ModuleInfo(key: "layers") var layers: [RtDetrV2DecoderLayer]
     @ModuleInfo(key: "query_pos_head") var queryPosHead: RtDetrV2MLPPredictionHead
-
-    // TODO: Extract shared decoder head wiring across RT-DETR/LW-DETR/RF-DETR.
     @ModuleInfo(key: "bbox_embed") var bboxEmbed: [RtDetrV2MLPPredictionHead]
     @ModuleInfo(key: "class_embed") var classEmbed: [Linear]
 
