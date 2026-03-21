@@ -50,7 +50,7 @@ class RfDetrDinov2Config {
     var outIndices: [Int] = []
 
     @CodingKey("window_block_indexes")
-    var windowBlockIndexes: [Int] = []
+    var windowBlockIndices: [Int] = []
 }
 
 @Codable

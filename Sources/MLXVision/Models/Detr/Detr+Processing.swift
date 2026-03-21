@@ -17,7 +17,7 @@ final class DetrForObjectDetectionProcessor: Processor {
 
     init(modelConfig: DetrForObjectDetectionConfig, imagePreprocessor: ImagePreprocessor) {
         self.labels = modelConfig.id2label.flattened
-        self.numQueries = modelConfig.queriesCount
+        self.numQueries = modelConfig.numQueries
         self.imagePreprocessor = imagePreprocessor
     }
 
@@ -56,7 +56,7 @@ final class DetrForInstanceSegmentationProcessor: Processor {
 
     init(modelConfig: DetrForObjectDetectionConfig, imagePreprocessor: ImagePreprocessor) {
         self.labels = modelConfig.id2label.flattened
-        self.numQueries = modelConfig.queriesCount
+        self.numQueries = modelConfig.numQueries
         self.imagePreprocessor = imagePreprocessor
     }
 

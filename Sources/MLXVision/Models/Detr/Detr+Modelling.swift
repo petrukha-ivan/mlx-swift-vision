@@ -23,8 +23,8 @@ final class DetrModelForObjectDetection: Module, Predictor {
 
     init(_ config: DetrForObjectDetectionConfig) {
         _model.wrappedValue = DetrModel(config)
-        _bboxPredictor.wrappedValue = DetrPredictionHead(inputDimensions: config.dimensions, hiddenDimensions: config.dimensions)
-        _classLabelsClassifier.wrappedValue = Linear(config.dimensions, config.id2label.count + 1)
+        _bboxPredictor.wrappedValue = DetrPredictionHead(inputDimensions: config.dModel, hiddenDimensions: config.dModel)
+        _classLabelsClassifier.wrappedValue = Linear(config.dModel, config.id2label.count + 1)
     }
 
     private lazy var _predict = MLX.compile { [unowned self] inputs in
@@ -60,8 +60,8 @@ final class DetrModelForInstanceSegmentation: Module, Predictor {
         model = DetrModel(config)
         _maskHead.wrappedValue = DetrMaskHead(config)
         _bboxAttention.wrappedValue = DetrMaskHeadAttention(config)
-        _bboxPredictor.wrappedValue = DetrPredictionHead(inputDimensions: config.dimensions, hiddenDimensions: config.dimensions)
-        _classLabelsClassifier.wrappedValue = Linear(config.dimensions, config.id2label.count + 1)
+        _bboxPredictor.wrappedValue = DetrPredictionHead(inputDimensions: config.dModel, hiddenDimensions: config.dModel)
+        _classLabelsClassifier.wrappedValue = Linear(config.dModel, config.id2label.count + 1)
     }
 
     override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
@@ -119,9 +119,9 @@ final class DetrModel: Module {
         backbone = DetrConvModel(config)
         encoder = DetrEncoder(config)
         decoder = DetrDecoder(config)
-        _inputProjection.wrappedValue = Conv2d(inputChannels: 2048, outputChannels: config.dimensions, kernelSize: 1)
-        _queryPositionEmbeddings.wrappedValue = Embedding(embeddingCount: config.queriesCount, dimensions: config.dimensions)
-        _queryIndices.wrappedValue = Array(0..<config.queriesCount).asMLXArray(dtype: .int32)
+        _inputProjection.wrappedValue = Conv2d(inputChannels: 2048, outputChannels: config.dModel, kernelSize: 1)
+        _queryPositionEmbeddings.wrappedValue = Embedding(embeddingCount: config.numQueries, dimensions: config.dModel)
+        _queryIndices.wrappedValue = Array(0..<config.numQueries).asMLXArray(dtype: .int32)
     }
 
     func callAsFunction(_ pixelValues: MLXArray, _ pixelMask: MLXArray? = nil) -> Output {
@@ -174,10 +174,10 @@ final class DetrConvModel: Module {
         _convEncoder.wrappedValue = DetrConvEncoder(config)
         switch config.positionEmbeddingType {
         case .sine:
-            _positionEmbedding.wrappedValue = DetrSinePositionEmbedding(embeddingDimensions: config.dimensions / 2)
+            _positionEmbedding.wrappedValue = DetrSinePositionEmbedding(embeddingDimensions: config.dModel / 2)
         case .learned:
             _positionEmbedding.wrappedValue = DetrLearnedPositionEmbedding(
-                embeddingDimensions: config.dimensions / 2,
+                embeddingDimensions: config.dModel / 2,
                 maxSize: config.positionEmbeddingMaxSize
             )
         }
@@ -219,7 +219,7 @@ final class DetrEncoder: Module {
     let layers: [DetrEncoderLayer]
 
     init(_ config: DetrConfig) {
-        layers = (0..<config.encoderLayersCount).map { _ in
+        layers = (0..<config.encoderLayers).map { _ in
             DetrEncoderLayer(config)
         }
     }
@@ -249,10 +249,10 @@ final class DetrEncoderLayer: Module {
     init(_ config: DetrConfig) {
         activation = ReLU()
         _attention.wrappedValue = DetrAttention(config)
-        _attentionNormalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
-        _feedforwardInput.wrappedValue = Linear(config.dimensions, config.encoderFeedforwardDimensions)
-        _feedforwardOutput.wrappedValue = Linear(config.encoderFeedforwardDimensions, config.dimensions)
-        _finalNormalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
+        _attentionNormalization.wrappedValue = LayerNorm(dimensions: config.dModel)
+        _feedforwardInput.wrappedValue = Linear(config.dModel, config.encoderFfnDim)
+        _feedforwardOutput.wrappedValue = Linear(config.encoderFfnDim, config.dModel)
+        _finalNormalization.wrappedValue = LayerNorm(dimensions: config.dModel)
     }
 
     func callAsFunction(
@@ -293,7 +293,7 @@ final class DetrDecoder: Module {
 
     init(_ config: DetrConfig) {
         layers = (0..<config.decoderLayers).map { _ in DetrDecoderLayer(config) }
-        _normalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
+        _normalization.wrappedValue = LayerNorm(dimensions: config.dModel)
     }
 
     func callAsFunction(
@@ -334,12 +334,12 @@ final class DetrDecoderLayer: Module {
     init(_ config: DetrConfig) {
         activation = ReLU()
         _attention.wrappedValue = DetrAttention(config)
-        _attentionNormalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
+        _attentionNormalization.wrappedValue = LayerNorm(dimensions: config.dModel)
         _encoderAttention.wrappedValue = DetrAttention(config)
-        _encoderAttentionNormalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
-        _feedforwardInput.wrappedValue = Linear(config.dimensions, config.decoderFeedforwardDimensions)
-        _feedforwardOutput.wrappedValue = Linear(config.decoderFeedforwardDimensions, config.dimensions)
-        _finalNormalization.wrappedValue = LayerNorm(dimensions: config.dimensions)
+        _encoderAttentionNormalization.wrappedValue = LayerNorm(dimensions: config.dModel)
+        _feedforwardInput.wrappedValue = Linear(config.dModel, config.decoderFfnDim)
+        _feedforwardOutput.wrappedValue = Linear(config.decoderFfnDim, config.dModel)
+        _finalNormalization.wrappedValue = LayerNorm(dimensions: config.dModel)
     }
 
     func callAsFunction(
@@ -397,10 +397,10 @@ final class DetrAttention: Module {
 
     init(_ config: DetrConfig) {
         numHeads = config.decoderAttentionHeads
-        _queryProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
-        _keyProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
-        _valueProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
-        _outProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
+        _queryProjection.wrappedValue = Linear(config.dModel, config.dModel)
+        _keyProjection.wrappedValue = Linear(config.dModel, config.dModel)
+        _valueProjection.wrappedValue = Linear(config.dModel, config.dModel)
+        _outProjection.wrappedValue = Linear(config.dModel, config.dModel)
     }
 
     func callAsFunction(
@@ -551,8 +551,8 @@ final class DetrMaskHead: Module {
     @ModuleInfo(key: "out_lay") var outProjection: Conv2d
 
     init(_ config: DetrConfig) {
-        let dim = config.dimensions + config.decoderAttentionHeads
-        let contextDim = config.dimensions
+        let dim = config.dModel + config.decoderAttentionHeads
+        let contextDim = config.dModel
         let hiddenSizes = ResNetConfig.all[config.backbone]!.hiddenSizes
         let fpnChannels = Array(hiddenSizes.reversed().suffix(3))
 
@@ -568,7 +568,7 @@ final class DetrMaskHead: Module {
         ]
 
         _outProjection.wrappedValue = Conv2d(
-            inputChannels: config.dimensions / 16,
+            inputChannels: config.dModel / 16,
             outputChannels: 1,
             kernelSize: 3,
             padding: 1
@@ -711,10 +711,10 @@ final class DetrMaskHeadAttention: Module {
 
     init(_ config: DetrConfig) {
         numHeads = config.decoderAttentionHeads
-        headDim = config.dimensions / config.decoderAttentionHeads
-        scale = pow(Float(config.dimensions) / Float(config.decoderAttentionHeads), -0.5)
-        _queryProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
-        _keyProjection.wrappedValue = Linear(config.dimensions, config.dimensions)
+        headDim = config.dModel / config.decoderAttentionHeads
+        scale = pow(Float(config.dModel) / Float(config.decoderAttentionHeads), -0.5)
+        _queryProjection.wrappedValue = Linear(config.dModel, config.dModel)
+        _keyProjection.wrappedValue = Linear(config.dModel, config.dModel)
     }
 
     func callAsFunction(

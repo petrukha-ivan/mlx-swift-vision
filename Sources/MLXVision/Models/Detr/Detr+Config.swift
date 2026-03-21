@@ -20,25 +20,25 @@ class DetrConfig {
     var backbone: String
 
     @CodingKey("d_model")
-    var dimensions: Int
+    var dModel: Int
 
     @CodingKey("encoder_layers")
-    var encoderLayersCount: Int
+    var encoderLayers: Int
 
     @CodingKey("encoder_ffn_dim")
-    var encoderFeedforwardDimensions: Int
+    var encoderFfnDim: Int
 
     @CodingKey("decoder_layers")
     var decoderLayers: Int
 
     @CodingKey("decoder_ffn_dim")
-    var decoderFeedforwardDimensions: Int
+    var decoderFfnDim: Int
 
     @CodingKey("decoder_attention_heads")
     var decoderAttentionHeads: Int
 
     @CodingKey("num_queries")
-    var queriesCount: Int
+    var numQueries: Int
 
     @CodingKey("position_embedding_type")
     var positionEmbeddingType: PositionEmbeddingType = .sine

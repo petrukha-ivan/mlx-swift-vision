@@ -341,14 +341,14 @@ final class RfDetrDinov2Encoder: Module {
         let maxStage = max(config.numHiddenLayers, outputStages.max() ?? config.numHiddenLayers)
 
         let windowAttentionLayers: Set<Int>
-        if config.windowBlockIndexes.isEmpty {
+        if config.windowBlockIndices.isEmpty {
             var all = Set(0...maxStage)
             for stage in outputStages {
                 all.remove(stage)
             }
             windowAttentionLayers = all
         } else {
-            windowAttentionLayers = Set(config.windowBlockIndexes)
+            windowAttentionLayers = Set(config.windowBlockIndices)
         }
 
         _layers.wrappedValue = (0..<config.numHiddenLayers).map { index in

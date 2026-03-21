@@ -305,7 +305,7 @@ final class Sam3ViTModel: Module {
         _embeddings.wrappedValue = Sam3ViTEmbeddings(config)
         _normalization.wrappedValue = LayerNorm(dimensions: config.hiddenSize, eps: config.layerNormEps)
         _layers.wrappedValue = (0..<config.numHiddenLayers).map {
-            Sam3ViTLayer(config, config.globalAttentionIndices.contains($0) ? 0 : config.windowSize)
+            Sam3ViTLayer(config, config.globalAttnIndices.contains($0) ? 0 : config.windowSize)
         }
     }
 

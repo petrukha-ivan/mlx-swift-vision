@@ -74,7 +74,7 @@ struct Sam3ViTConfig {
     var windowSize: Int
 
     @CodingKey("global_attn_indexes")
-    var globalAttentionIndices: [Int]
+    var globalAttnIndices: [Int]
 
     @CodingKey("layer_norm_eps")
     var layerNormEps: Float
