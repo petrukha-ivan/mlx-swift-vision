@@ -105,10 +105,30 @@ struct BenchmarkOptions: ParsableArguments {
                 try processing()
             }
         }
+
+        let clock = ContinuousClock()
+        var durations: [Duration] = []
         try measure("Benchmark") {
             for _ in 0..<processingSteps {
+                let start = clock.now
                 try processing()
+                let duration = clock.now - start
+                durations.append(duration)
             }
         }
+
+        durations.sort()
+        let min = durations.first!
+        let max = durations.last!
+        let median = durations[durations.count / 2]
+        let average = durations.reduce(Duration.seconds(0), +) / durations.count
+        let medianFPS = Duration.seconds(1) / median
+        let averageFPS = Duration.seconds(1) / average
+        print("Benchmark min: \(min.formatted(.units(allowed: [.minutes, .seconds, .milliseconds])))")
+        print("Benchmark max: \(max.formatted(.units(allowed: [.minutes, .seconds, .milliseconds])))")
+        print("Benchmark median: \(median.formatted(.units(allowed: [.minutes, .seconds, .milliseconds])))")
+        print("Benchmark average: \(average.formatted(.units(allowed: [.minutes, .seconds, .milliseconds])))")
+        print("Benchmark median FPS: \(medianFPS.formatted(.number.precision(.fractionLength(1))))")
+        print("Benchmark average FPS: \(averageFPS.formatted(.number.precision(.fractionLength(1))))")
     }
 }
