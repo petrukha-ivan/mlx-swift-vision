@@ -65,8 +65,8 @@ final class SigLIPEmbeddingsModel: Module, Predictor {
     init(_ config: SigLIPConfig) {
         _textModel.wrappedValue = SigLIPTextModel(config.textConfig)
         _visionModel.wrappedValue = SigLIPVisionModel(config.visionConfig)
-        _logitScale.wrappedValue = MLXArray(0.0)
-        _logitBias.wrappedValue = MLXArray(0.0)
+        _logitScale.wrappedValue = MLXArray([0])
+        _logitBias.wrappedValue = MLXArray([0])
     }
 
     private lazy var _predictText = MLX.compile { [unowned self] inputs in
