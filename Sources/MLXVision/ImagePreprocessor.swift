@@ -11,8 +11,27 @@ import MLX
 
 class ImagePreprocessor {
 
+    class BitmapBuffer {
+
+        var bitmap: MLXArray?
+        var shape: [Int] = []
+
+        func bitmap(height: Int, width: Int) -> MLXArray {
+            let shape = [height, width, 4]
+            if let bitmap, self.shape == shape {
+                return bitmap
+            }
+
+            let bitmap = MLXArray.zeros(shape, dtype: .uint8)
+            self.bitmap = bitmap
+            self.shape = shape
+            return bitmap
+        }
+    }
+
     let config: ImagePreprocessorConfig
     let overrides: ModelOverrides
+    let buffer = BitmapBuffer()
     let context = CIContext()
 
     init(_ config: ImagePreprocessorConfig, overrides: ModelOverrides = ModelOverrides()) {
@@ -32,13 +51,17 @@ class ImagePreprocessor {
         let height = Int(size.height.rounded())
         let width = Int(size.width.rounded())
 
-        let format = CIFormat.RGBX8
-        let rowBytes = width * 4 * 1
-
-        let bitmap = MLXArray.zeros([height, width, 4], dtype: .uint8)
+        let bitmap = buffer.bitmap(height: height, width: width)
         var bitmapData = bitmap.asData(access: .noCopy).data
         bitmapData.withUnsafeMutableBytes { buffer in
-            context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: format, colorSpace: nil)
+            context.render(
+                image,
+                toBitmap: buffer.baseAddress!,
+                rowBytes: width * 4,
+                bounds: image.extent,
+                format: .RGBX8,
+                colorSpace: nil
+            )
         }
 
         let outputs = _preprocess([bitmap])
