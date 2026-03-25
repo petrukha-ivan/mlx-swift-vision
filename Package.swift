@@ -9,7 +9,7 @@ let package = Package(
     products: [.library(name: "MLXVision", targets: ["MLXVision"])],
     dependencies: [
         .package(url: "https://github.com/reers/ReerCodable", .upToNextMinor(from: "1.4.0")),
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.30.6")),
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.1")),
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.1.1")),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),
     ],
