@@ -95,13 +95,15 @@ struct BenchmarkOptions: ParsableArguments {
     @Flag
     var benchmark: Bool = false
 
-    func benchmark(
-        warmupSteps: Int = 100,
-        processingSteps: Int = 1000,
-        processing: () throws -> Void
-    ) throws {
+    @Option
+    var benchmarkWarmupSteps: Int = 100
+
+    @Option
+    var benchmarkProcessingSteps: Int = 1000
+
+    func benchmark(processing: () throws -> Void) throws {
         try measure("Warmup") {
-            for _ in 0..<warmupSteps {
+            for _ in 0..<benchmarkWarmupSteps {
                 try processing()
             }
         }
@@ -109,7 +111,7 @@ struct BenchmarkOptions: ParsableArguments {
         let clock = ContinuousClock()
         var durations: [Duration] = []
         try measure("Benchmark") {
-            for _ in 0..<processingSteps {
+            for _ in 0..<benchmarkProcessingSteps {
                 let start = clock.now
                 try processing()
                 let duration = clock.now - start
