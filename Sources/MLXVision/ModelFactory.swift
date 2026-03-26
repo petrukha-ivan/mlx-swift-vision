@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Hub
+import HuggingFace
 import MLX
 import MLXNN
 import ReerCodable
@@ -39,13 +39,13 @@ extension ModelFactoryError: LocalizedError {
 /// Source descriptor for loading model assets.
 public enum ModelSource: ExpressibleByStringLiteral {
     /// Load model assets from Hugging Face Hub.
-    case hub(id: String, revision: String, hubApi: HubApi = .shared)
+    case hub(id: String, revision: String, client: HubClient = .default)
     /// Load model assets from an existing local directory.
     case directory(URL)
 
     /// Creates a Hub source descriptor.
-    public init(id: String, revision: String = "main", hubApi: HubApi = .shared) {
-        self = .hub(id: id, revision: revision, hubApi: hubApi)
+    public init(id: String, revision: String = "main", client: HubClient = .default) {
+        self = .hub(id: id, revision: revision, client: client)
     }
 
     /// Creates a local-directory source descriptor.
@@ -55,7 +55,7 @@ public enum ModelSource: ExpressibleByStringLiteral {
 
     /// Creates a Hub source descriptor from a string literal model ID.
     public init(stringLiteral value: String) {
-        self = .hub(id: value, revision: "main", hubApi: .shared)
+        self = .hub(id: value, revision: "main", client: .default)
     }
 }
 
@@ -99,20 +99,19 @@ public final class ModelFactory: Sendable {
         _ source: ModelSource,
         for task: T.Type,
         overrides: ModelOverrides = ModelOverrides(),
-        progressHandler: (@Sendable (Double) -> Void)? = nil
+        progressHandler: (@MainActor @Sendable (Progress) -> Void)? = nil
     ) async throws -> AnyPipeline<T.Input, T.Output> {
         let modelDirectory: URL =
             switch source {
             case .directory(let directory):
                 directory
-            case .hub(let id, let revision, let hubApi):
-                try await hubApi.snapshot(
-                    from: id,
+            case .hub(let id, let revision, let client):
+                try await client.downloadSnapshot(
+                    of: "\(id)",
                     revision: revision,
-                    matching: ["*.txt", "*.json", "*.safetensors"]
-                ) { progress, _ in
-                    progressHandler?(progress.fractionCompleted)
-                }
+                    matching: ["*.txt", "*.json", "*.safetensors"],
+                    progressHandler: progressHandler
+                )
             }
 
         let modelConfigURL = modelDirectory.appending(component: "config.json")

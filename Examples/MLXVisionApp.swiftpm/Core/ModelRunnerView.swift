@@ -7,7 +7,7 @@
 
 import SwiftUI
 import MLXVision
-import Hub
+import HuggingFace
 
 enum ModelState {
     case waiting
@@ -83,16 +83,16 @@ struct ModelRunnerView: View {
 
     func loadModelContainer() async throws {
         let factory = ModelFactory.shared
-        let hubApi = HubApi(hfToken: token)
-        let source = ModelSource.hub(id: modelSelection.id, revision: modelSelection.revision, hubApi: hubApi)
+        let client = HubClient(host: HubClient.defaultHost, tokenProvider: token.isEmpty ? .environment : .fixed(token: token))
+        let source = ModelSource.hub(id: modelSelection.id, revision: modelSelection.revision, client: client)
         let overrides = ModelOverrides(
             inputSize: modelSelection.inputSize.map(CGFloat.init).map({ CGSize(width: $0, height: $0) }),
             quantizeBits: modelSelection.quantizeBits
         )
 
-        let progressHandler: @Sendable (Double) -> Void = { progress in
+        let progressHandler: @MainActor @Sendable (Progress) -> Void = { progress in
             Task { @MainActor in
-                self.modelState = .loading(progress)
+                self.modelState = .loading(progress.fractionCompleted)
             }
         }
 

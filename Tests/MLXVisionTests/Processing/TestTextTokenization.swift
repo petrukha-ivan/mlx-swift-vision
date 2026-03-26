@@ -7,7 +7,7 @@
 
 import Testing
 import Foundation
-import Hub
+import HuggingFace
 @testable import MLXVision
 
 struct TokenizationResult: Codable {
@@ -18,8 +18,9 @@ struct TokenizationResult: Codable {
 @Test func testCLIPTokenizationAlignedWithTransformers() async throws {
     let resultsURL = try #require(Bundle.module.url(forResource: "clip_tokenizer_results", withExtension: "json"))
     let results = try [TokenizationResult].decoded(from: resultsURL)
-    let hubApi = HubApi(downloadBase: URL.temporaryDirectory)
-    let tokenizerURL = try await hubApi.snapshot(from: "openai/clip-vit-base-patch16", matching: ["*.txt", "*.json"])
+    let cacheDirectory = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let client = HubClient(cache: HubCache(cacheDirectory: cacheDirectory))
+    let tokenizerURL = try await client.downloadSnapshot(of: "openai/clip-vit-base-patch16", matching: ["*.txt", "*.json"])
     let tokenizer = try CLIPTokenizer.from(url: tokenizerURL)
     for result in results {
         #expect(result.tokens == tokenizer.encode(text: result.text), "\"\(result.text)\" encoding failed")
@@ -29,8 +30,9 @@ struct TokenizationResult: Codable {
 @Test func testSigLIPTokenizationAlignedWithTransformers() async throws {
     let resultsURL = try #require(Bundle.module.url(forResource: "siglip_tokenizer_results", withExtension: "json"))
     let results = try [TokenizationResult].decoded(from: resultsURL)
-    let hubApi = HubApi(downloadBase: URL.temporaryDirectory)
-    let tokenizerURL = try await hubApi.snapshot(from: "google/siglip-base-patch16-224", matching: ["*.txt", "*.json"])
+    let cacheDirectory = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let client = HubClient(cache: HubCache(cacheDirectory: cacheDirectory))
+    let tokenizerURL = try await client.downloadSnapshot(of: "google/siglip-base-patch16-224", matching: ["*.txt", "*.json"])
     let tokenizer = try SigLIPTokenizer.from(url: tokenizerURL)
     for result in results {
         #expect(result.tokens == tokenizer.encode(text: result.text), "\"\(result.text)\" encoding failed")

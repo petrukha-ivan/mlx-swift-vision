@@ -10,7 +10,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/reers/ReerCodable", .upToNextMinor(from: "1.4.0")),
         .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.1")),
-        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.1.1")),
+        .package(url: "https://github.com/huggingface/swift-huggingface.git", .upToNextMinor(from: "0.9.0")),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),
     ],
     targets: [
@@ -20,8 +20,7 @@ let package = Package(
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "ReerCodable", package: "ReerCodable"),
-                .product(name: "Tokenizers", package: "swift-transformers"),
-                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "HuggingFace", package: "swift-huggingface"),
             ]
         ),
         .executableTarget(
