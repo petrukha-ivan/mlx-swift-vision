@@ -42,8 +42,12 @@ struct ModelRunnerView: View {
                 }
             case .loading(let progress):
                 List {
-                    Section("Loading") {
+                    Section {
                         ProgressView(value: progress)
+                    } header: {
+                        Text("Loading")
+                    } footer: {
+                        Text("Loading progress is currently unreliable in the swift-huggingface package. Waiting for it to be fixed in future updates.")
                     }
                 }
             case .loaded(let modelContainer):
