@@ -7,11 +7,11 @@
 | Task | Models |
 | - | - |
 | Image Classification | ResNet, EfficientNet |
-| Object Detection | DETR |
-| Instance Segmentation | DETR |
-| Zero-shot Classification | CLIP |
+| Object Detection | DETR, RF-DETR, LW-DETR, RT-DETR |
+| Instance Segmentation | DETR, RF-DETR |
+| Zero-shot Classification | CLIP, SigLip |
 | Zero-shot Segmentation | SAM 3 |
-| Embeddings Extraction | CLIP |
+| Embeddings Extraction | CLIP, SigLip |
 
 ## Installation
 
@@ -44,6 +44,18 @@ let factory = ModelFactory.shared
 let model = try await factory.load("microsoft/resnet-50", for: ImageClassificationTask.self)
 ```
 
+### Model Compression
+
+You can override the default model configuration. For example, with the following configuration, it is possible to run the SAM 3 model even on an iPhone. By default, all models are loaded in `bfloat16` format.
+
+```swift
+let inputSize = CGSize(width: 336.0, height: 336.0)
+let overrides = ModelOverrides(inputSize: inputSize, quantizeBits: 4)
+
+let factory = ModelFactory.shared
+let model = try await factory.load("facebook/sam3", for: ZeroShotSegmentationTask.self, overrides: overrides)
+```
+
 ### Run a Model
 
 ### Image Classification
@@ -59,7 +71,7 @@ let summary = results.map { "\($0.label) - \($0.score)" } // Labels with scores
 ```swift
 let request = ObjectDetectionRequest(image: image)
 let result = try model(request).top(1)[0] // Top detection result
-let bbox = result.bbox // Normalized bounding box in (x, y, w, h) format
+let bbox = result.bbox // Normalized CGRect
 ```
 
 ### Instance Segmentation
@@ -67,7 +79,7 @@ let bbox = result.bbox // Normalized bounding box in (x, y, w, h) format
 ```swift
 let request = InstanceSegmentationRequest(image: image)
 let result = try model(request).top(1)[0] // Top segmentation result
-let mask = result.mask // MLXArray with (w, h) shape filled with 0 or 1 values
+let mask = result.mask // Grayscale CIImage mask
 ```
 
 ### Zero-shot Classification
@@ -96,18 +108,6 @@ let results = try model(request)
 
 let annotator = BoxAnnotator(lineWidth: 8.0) // See also LabelAnnotator, MaskAnnotator
 let annotatedImage = annotator.annotate(image: image, detections: results)
-```
-
-## Model Compression
-
-You can override the default model configuration. For example, with the following configuration, it is possible to run the SAM 3 model even on an iPhone. By default, all models are loaded in `bfloat16` format.
-
-```swift
-let inputSize = CGSize(width: 336.0, height: 336.0)
-let overrides = ModelOverrides(inputSize: inputSize, quantizeBits: 4)
-
-let factory = ModelFactory.shared
-let model = try await factory.load("facebook/sam3", for: ZeroShotSegmentationTask.self, overrides: overrides)
 ```
 
 ## Examples
