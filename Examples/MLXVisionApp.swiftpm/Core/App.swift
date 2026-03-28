@@ -6,12 +6,12 @@
 //
 
 import SwiftUI
-import MLX
 
 @main
 struct App: SwiftUI.App {
 
     @State var modelSelection: ModelSelection?
+    @State var appSettings = AppSettings()
     @State var showSettings = false
 
     var body: some Scene {
@@ -39,6 +39,10 @@ struct App: SwiftUI.App {
                     .sheet(isPresented: $showSettings) {
                         AppSettingsView()
                     }
+            }
+            .environment(appSettings)
+            .task {
+                appSettings.applyCacheLimit()
             }
         }
     }

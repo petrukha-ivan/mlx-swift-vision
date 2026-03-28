@@ -6,17 +6,43 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct AppSettingsView: View {
 
-    @AppStorage("token") var token: String = ""
+    @Environment(AppSettings.self) private var appSettings
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
+                @Bindable var appSettings = appSettings
+
                 Section {
-                    SecureField("Access Token", text: $token)
+                    VStack {
+                        LabeledContent("Cache Limit") {
+                            Text(
+                                Measurement(
+                                    value: appSettings.cacheLimit,
+                                    unit: UnitInformationStorage.bytes
+                                )
+                                .formatted(.byteCount(style: .memory))
+                            )
+                        }
+
+                        Slider(
+                            value: $appSettings.cacheLimit,
+                            in: 0...AppSettings.deviceMemorySize
+                        )
+                    }
+                } header: {
+                    Text("GPU")
+                } footer: {
+                    Text("A larger cache limit slightly improves inference speed")
+                }
+
+                Section {
+                    SecureField("Access Token", text: $appSettings.token)
                 } header: {
                     Text("Hugging Face")
                 } footer: {

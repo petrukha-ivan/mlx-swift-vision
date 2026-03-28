@@ -29,7 +29,7 @@ struct ModelRunnerView: View {
     @State var modelSelection: ModelSelection
     @State var modelState: ModelState = .waiting
     @State var inputState = InputSourceState()
-    @AppStorage("token") var token: String = ""
+    @Environment(AppSettings.self) private var appSettings
 
     var body: some View {
         Group {
@@ -83,7 +83,8 @@ struct ModelRunnerView: View {
 
     func loadModelContainer() async throws {
         let factory = ModelFactory.shared
-        let client = HubClient(host: HubClient.defaultHost, tokenProvider: token.isEmpty ? .environment : .fixed(token: token))
+        let tokenProvider = appSettings.token.isEmpty ? TokenProvider.environment : .fixed(token: appSettings.token)
+        let client = HubClient(host: HubClient.defaultHost, tokenProvider: tokenProvider)
         let source = ModelSource.hub(id: modelSelection.id, revision: modelSelection.revision, client: client)
         let overrides = ModelOverrides(
             inputSize: modelSelection.inputSize.map(CGFloat.init).map({ CGSize(width: $0, height: $0) }),
