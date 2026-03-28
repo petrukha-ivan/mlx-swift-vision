@@ -10,10 +10,10 @@ import SwiftUI
 struct PerformanceView: View {
 
     let performance: ModelRunnerPerformance
+    let onReset: () -> Void
 
     var body: some View {
         Group {
-
             LabeledContent("Latest Processing") {
                 performance.latestProcessingTime.map {
                     Text($0.formatted(.units(allowed: [.seconds, .milliseconds])))
@@ -31,6 +31,9 @@ struct PerformanceView: View {
                     Text($0.formatted(.number.precision(.fractionLength(1))))
                 }
             }
+
+            Button("Reset", role: .destructive, action: onReset)
+                .disabled(performance.latestProcessingTime == nil)
         }
     }
 }

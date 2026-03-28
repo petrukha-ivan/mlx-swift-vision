@@ -45,7 +45,9 @@ struct ObjectDetectionView: View {
             }
         } footer: {
             Section("Performance") {
-                PerformanceView(performance: modelRunner.performance)
+                PerformanceView(performance: modelRunner.performance) {
+                    modelRunner.resetPerformance()
+                }
             }
         }
         .task(id: [scoreThreshold.description]) {

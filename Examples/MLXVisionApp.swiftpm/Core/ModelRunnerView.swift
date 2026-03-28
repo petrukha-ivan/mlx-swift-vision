@@ -215,6 +215,15 @@ class ModelRunner<T: VisionTask, Value> {
             framesPerSecond: framesPerSecond
         )
     }
+
+    func resetPerformance() {
+        recentProcessingTimes.removeAll()
+        performance = ModelRunnerPerformance(
+            latestProcessingTime: nil,
+            averageProcessingTime: nil,
+            framesPerSecond: nil
+        )
+    }
 }
 
 struct ModelRunnerPerformance: Equatable {

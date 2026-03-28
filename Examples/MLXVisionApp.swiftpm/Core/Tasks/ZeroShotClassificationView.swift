@@ -39,7 +39,9 @@ struct ZeroShotClassificationView: View {
             }
         } footer: {
             Section("Performance") {
-                PerformanceView(performance: modelRunner.performance)
+                PerformanceView(performance: modelRunner.performance) {
+                    modelRunner.resetPerformance()
+                }
             }
         }
         .task(id: [labels]) {
