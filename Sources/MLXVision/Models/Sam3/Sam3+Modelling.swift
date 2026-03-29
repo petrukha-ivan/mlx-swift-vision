@@ -46,7 +46,9 @@ final class Sam3Model: Module, Predictor {
         }
     }
 
-    private lazy var _predict = MLX.compile { [unowned self] inputs in
+    // Sam3's traced graph currently overflows MLX's compile DFS stack, so keep
+    // this model on the eager path until the upstream compiler is fixed.
+    private func _predict(_ inputs: [MLXArray]) -> [MLXArray] {
         let textTokens = inputs[0]
         let textMask = inputs[1]
         let pixelValues = inputs[2]
