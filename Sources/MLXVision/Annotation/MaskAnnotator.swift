@@ -12,24 +12,21 @@ import CoreGraphics
 public class MaskAnnotator<Detection: MaskedResult & LabeledResult>: Annotator {
 
     let alpha: CGFloat
+    let color: ColorProvider
 
-    public init(alpha: CGFloat = 0.8) {
+    public init(alpha: CGFloat = 0.8, color: ColorProvider = .auto) {
         self.alpha = alpha
+        self.color = color
     }
 
-    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
-        var image = image
-        for detection in detections {
-            let hash = detection.label.hash
-            let color = CIColor(
-                red: CGFloat(hash & 255) / 255.0,
-                green: CGFloat((hash >> 8) & 255) / 255.0,
-                blue: CGFloat((hash >> 16) & 255) / 255.0,
-                alpha: alpha
-            )
+    public func overlay(for image: CIImage, detections: [Detection]) -> CIImage {
+        let transparent = CIImage(color: .clear).cropped(to: image.extent)
+        var overlay = transparent
 
+        for detection in detections {
+            let color = color.color(for: detection.label, alpha: alpha)
             let filter = CIFilter.blendWithMask()
-            filter.backgroundImage = image
+            filter.backgroundImage = transparent
             filter.inputImage = CIImage(color: color).cropped(to: image.extent)
             filter.maskImage = detection.mask
                 .resized(size: image.extent.size, method: .nearest)
@@ -41,10 +38,10 @@ public class MaskAnnotator<Detection: MaskedResult & LabeledResult>: Annotator {
                 )
 
             if let output = filter.outputImage {
-                image = output
+                overlay = output.composited(over: overlay)
             }
         }
 
-        return image
+        return overlay
     }
 }

@@ -8,33 +8,35 @@
 import CoreImage
 import CoreGraphics
 
-public class BoxAnnotator<Detection: BoxedResult>: Annotator {
+public class BoxAnnotator<Detection: BoxedResult & LabeledResult>: Annotator {
 
     let lineWidth: CGFloat
-    let strokeColor: CGColor
+    let strokeColor: ColorProvider
 
     public init(
         lineWidth: CGFloat = 8.0,
-        strokeColor: CGColor = CGColor(red: 0, green: 0, blue: 0, alpha: 1)
+        strokeColor: ColorProvider = .auto
     ) {
         self.lineWidth = lineWidth
         self.strokeColor = strokeColor
     }
 
-    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
+    public func overlay(for image: CIImage, detections: [Detection]) -> CIImage {
+        let transparent = CIImage(color: .clear).cropped(to: image.extent)
         let canvasSize = CGSize(width: 1024, height: 1024)
         let canvasScale = CGAffineTransform(scaleX: canvasSize.width, y: canvasSize.height)
+
         let annotation = CGImage.render(size: canvasSize) { context in
             context.setLineWidth(lineWidth)
-            context.setStrokeColor(strokeColor)
-            for bbox in detections.map({ $0.bbox.applying(canvasScale) }) {
+            for detection in detections {
+                let strokeColor = strokeColor.color(for: detection.label, alpha: 1.0).resolvedCGColor
+                let bbox = detection.bbox.applying(canvasScale)
+                context.setStrokeColor(strokeColor)
                 context.stroke(bbox)
             }
         }
 
-        let filter = CIFilter.sourceOverCompositing()
-        filter.backgroundImage = image
-        filter.inputImage = annotation.map(CIImage.init)?
+        let overlay = annotation.map(CIImage.init)?
             .resized(size: image.extent.size)
             .transformed(
                 by: CGAffineTransform(
@@ -43,6 +45,6 @@ public class BoxAnnotator<Detection: BoxedResult>: Annotator {
                 )
             )
 
-        return filter.outputImage ?? image
+        return overlay ?? transparent
     }
 }

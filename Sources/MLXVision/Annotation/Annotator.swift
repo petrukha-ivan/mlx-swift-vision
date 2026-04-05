@@ -11,7 +11,13 @@ public protocol Annotator<Detection> {
 
     associatedtype Detection
 
-    func annotate(image: CIImage, detections: [Detection]) -> CIImage
+    func overlay(for image: CIImage, detections: [Detection]) -> CIImage
+}
+
+public extension Annotator {
+    func annotate(image: CIImage, detections: [Detection]) -> CIImage {
+        overlay(for: image, detections: detections).composited(over: image)
+    }
 }
 
 public struct ComposedAnnotator<Detection>: Annotator {
@@ -26,9 +32,10 @@ public struct ComposedAnnotator<Detection>: Annotator {
         self.annotators = annotators
     }
 
-    public func annotate(image: CIImage, detections: [Detection]) -> CIImage {
-        annotators.reduce(image) { image, annotator in
-            annotator.annotate(image: image, detections: detections)
+    public func overlay(for image: CIImage, detections: [Detection]) -> CIImage {
+        let transparent = CIImage(color: .clear).cropped(to: image.extent)
+        return annotators.reduce(transparent) { overlay, annotator in
+            annotator.overlay(for: image, detections: detections).composited(over: overlay)
         }
     }
 }
