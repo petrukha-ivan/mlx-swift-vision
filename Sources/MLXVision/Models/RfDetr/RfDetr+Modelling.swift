@@ -42,6 +42,9 @@ final class RfDetrModelForObjectDetection: Module, Predictor {
     }
 }
 
+// Detection works fine, but there seems to be an issue with the segmentation weights.
+// Compared with the previously used checkpoints, segmentation returns many incorrect results.
+// Waiting for this PR to be merged: https://github.com/huggingface/transformers/pull/36895
 final class RfDetrModelForInstanceSegmentation: Module, Predictor {
 
     typealias Output = (
@@ -63,6 +66,20 @@ final class RfDetrModelForInstanceSegmentation: Module, Predictor {
         _bboxPredictionHead.wrappedValue = RfDetrMLPPredictionHead(config)
         _segmentationHead.wrappedValue = RfDetrSegmentationHead(config)
         decoderLayers = config.decoderLayers
+    }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0
+                .replacing("model.model", with: "model")
+                .replacing("model.class_embed", with: "class_embed")
+                .replacing("model.bbox_embed", with: "bbox_embed")
+                .replacing("spatial_features_proj", with: "segmentation_head.spatial_features_proj")
+                .replacing("query_features_block", with: "segmentation_head.query_features_block")
+                .replacing("query_features_proj", with: "segmentation_head.query_features_proj")
+                .replacing("segmentation_bias", with: "segmentation_head.bias")
+                .replacing("blocks", with: "segmentation_head.blocks")
+        }
     }
 
     private lazy var _predict = MLX.compile { [unowned self] inputs in
@@ -97,6 +114,7 @@ final class RfDetrModelForInstanceSegmentation: Module, Predictor {
 }
 
 final class RfDetrModel: LwDetrModel {
+
     init(_ config: RfDetrConfig, numClasses: Int) {
         super.init(
             numQueries: config.numQueries,
@@ -110,14 +128,35 @@ final class RfDetrModel: LwDetrModel {
             }
         )
     }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0
+                .replacing("backbone.0.", with: "backbone.")
+                .replacing("transformer.enc_output.", with: "enc_output.")
+                .replacing("transformer.transformer.enc_output_norm.", with: "enc_output_norm.")
+                .replacing("transformer.enc_output_norm.", with: "enc_output_norm.")
+                .replacing("transformer.enc_out_class_embed.", with: "enc_out_class_embed.")
+                .replacing("transformer.enc_out_bbox_embed.", with: "enc_out_bbox_embed.")
+                .replacing("transformer.decoder.", with: "decoder.")
+                .replacing("refpoint_embed.", with: "reference_point_embed.")
+        }
+    }
 }
 
 final class RfDetrConvEncoder: LwDetrConvEncoder {
+
     init(_ config: RfDetrConfig) {
         super.init(
             backbone: RfDetrDinov2Backbone(config.backboneConfig),
             projector: RfDetrScaleProjector(config)
         )
+    }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0.replacing("encoder.encoder.", with: "backbone.")
+        }
     }
 }
 
@@ -197,7 +236,6 @@ final class RfDetrDinov2Embeddings: Module {
 
     @ModuleInfo(key: "patch_embeddings") var patchEmbeddings: RfDetrDinov2PatchEmbeddings
     @ParameterInfo(key: "cls_token") var classToken: MLXArray
-    @ParameterInfo(key: "register_tokens") var registerTokens: MLXArray
     @ParameterInfo(key: "mask_token") var maskToken: MLXArray
     @ParameterInfo(key: "position_embeddings") var positionEmbeddings: MLXArray
 
@@ -206,7 +244,6 @@ final class RfDetrDinov2Embeddings: Module {
 
     init(_ config: RfDetrDinov2Config) {
         _classToken.wrappedValue = MLX.zeros([1, 1, config.hiddenSize])
-        _registerTokens.wrappedValue = MLX.zeros([1, config.numRegisterTokens, config.hiddenSize])
         _maskToken.wrappedValue = MLX.zeros([1, config.hiddenSize])
         _patchEmbeddings.wrappedValue = RfDetrDinov2PatchEmbeddings(config)
 
@@ -237,18 +274,6 @@ final class RfDetrDinov2Embeddings: Module {
             height: height,
             width: width
         )
-
-        if registerTokens.shape[1] > 0 {
-            let batchRegisterTokens = MLX.repeated(registerTokens, count: batchSize, axis: 0)
-            embeddings = MLX.concatenated(
-                [
-                    embeddings[0..., 0..<1, 0...],
-                    batchRegisterTokens,
-                    embeddings[0..., 1..., 0...],
-                ],
-                axis: 1
-            )
-        }
 
         if numWindows > 1 {
             embeddings = partitionWindows(
@@ -538,8 +563,17 @@ final class RfDetrDinov2MLP: Module, UnaryLayer {
 }
 
 final class RfDetrScaleProjector: LwDetrScaleProjector {
+
     init(_ config: RfDetrConfig) {
         super.init(scaleLayers: [RfDetrScaleProjectorStage(config)])
+    }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0
+                .replacing("stages.0.0.", with: "scale_layers.0.projector_layer.")
+                .replacing("stages.0.1.", with: "scale_layers.0.layer_norm.")
+        }
     }
 }
 
@@ -555,6 +589,7 @@ final class RfDetrScaleProjectorStage: LwDetrScaleProjectorStage {
 }
 
 final class RfDetrC2FLayer: LwDetrC2FLayer {
+
     init(_ config: RfDetrConfig, inputChannels: Int) {
         let hiddenChannels = Int(Float(config.dModel) * config.hiddenExpansion)
         super.init(
@@ -583,13 +618,23 @@ final class RfDetrC2FLayer: LwDetrC2FLayer {
             }
         )
     }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0
+                .replacing("m.", with: "bottlenecks.")
+                .replacing("cv1.", with: "conv1.")
+                .replacing("cv2.", with: "conv2.")
+                .replacing("bn.", with: "norm.")
+        }
+    }
 }
 
 final class RfDetrDepthwiseConvBlock: Module, UnaryLayer {
 
-    @ModuleInfo(key: "dwconv") var depthwiseConvolution: Conv2d
-    @ModuleInfo(key: "norm") var normalization: LayerNorm
-    @ModuleInfo(key: "pwconv1") var pointwiseProjection: Linear
+    @ModuleInfo(key: "depthwise_conv") var depthwiseConvolution: Conv2d
+    @ModuleInfo(key: "layernorm") var normalization: LayerNorm
+    @ModuleInfo(key: "pointwise_conv") var pointwiseProjection: Linear
 
     private let activation = GELU(approximation: .none)
 
@@ -606,7 +651,7 @@ final class RfDetrDepthwiseConvBlock: Module, UnaryLayer {
 
 final class RfDetrSegmentationMLPBlock: Module, UnaryLayer {
 
-    @ModuleInfo(key: "norm_in") var inputNormalization: LayerNorm
+    @ModuleInfo(key: "norm") var inputNormalization: LayerNorm
     @ModuleInfo(key: "fc1") var expansionProjection: Linear
     @ModuleInfo(key: "fc2") var outputProjection: Linear
 
@@ -620,7 +665,9 @@ final class RfDetrSegmentationMLPBlock: Module, UnaryLayer {
 
     override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
         parameters.renameKeys {
-            $0.replacing("layers.0.", with: "fc1.").replacing("layers.2.", with: "fc2.")
+            $0
+                .replacing("mlp.fc1.", with: "fc1.")
+                .replacing("mlp.fc2.", with: "fc2.")
         }
     }
 
@@ -677,6 +724,7 @@ final class RfDetrSegmentationHead: Module {
 }
 
 final class RfDetrDecoder: LwDetrDecoder {
+
     init(_ config: RfDetrConfig) {
         super.init(
             dModel: config.dModel,
@@ -689,9 +737,16 @@ final class RfDetrDecoder: LwDetrDecoder {
             )
         )
     }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0.replacing("norm.", with: "layernorm.")
+        }
+    }
 }
 
 final class RfDetrDecoderLayer: LwDetrDecoderLayer {
+
     init(_ config: RfDetrConfig) {
         super.init(
             dModel: config.dModel,
@@ -700,14 +755,46 @@ final class RfDetrDecoderLayer: LwDetrDecoderLayer {
             mlp: RfDetrDecoderMLP(config)
         )
     }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        parameters.renameKeys {
+            $0
+                .replacing("linear1.", with: "mlp.fc1.")
+                .replacing("linear2.", with: "mlp.fc2.")
+                .replacing("norm1.", with: "self_attn_layer_norm.")
+                .replacing("norm2.", with: "cross_attn_layer_norm.")
+                .replacing("norm3.", with: "layer_norm.")
+                .replacing("out_proj.", with: "o_proj.")
+        }
+    }
 }
 
 final class RfDetrDecoderSelfAttention: LwDetrDecoderSelfAttention {
+
     init(_ config: RfDetrConfig) {
         super.init(
             dModel: config.dModel,
             numHeads: config.decoderSelfAttentionHeads,
             attentionBias: config.attentionBias
+        )
+    }
+
+    override func sanitize(parameters: ModuleParameters) -> ModuleParameters {
+        .unflattened(
+            parameters.flattened().flatMap { key, value in
+                switch key {
+                case "in_proj_weight":
+                    zip(["q", "k", "v"], value.split(parts: 3, axis: 0)).map {
+                        ("\($0)_proj.weight", $1)
+                    }
+                case "in_proj_bias":
+                    zip(["q", "k", "v"], value.split(parts: 3, axis: 0)).map {
+                        ("\($0)_proj.bias", $1)
+                    }
+                default:
+                    [(key, value)]
+                }
+            }
         )
     }
 }
